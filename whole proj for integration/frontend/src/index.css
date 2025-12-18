@@ -174,8 +174,11 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  /* Use a safe global box-sizing and avoid applying borders to every element */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
   }
 
   body {
@@ -268,6 +271,45 @@
   .action-glow:hover {
     box-shadow: var(--shadow-glow);
     transform: translateY(-2px);
+  }
+
+  /* Task hover: elevate and glow */
+  .task-hover {
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .task-hover:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: var(--shadow-glow);
+    z-index: 30;
+  }
+
+  /* Parallax background layer used on login page */
+  .parallax-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-size: cover;
+    background-position: center;
+    will-change: transform, filter;
+    transform: translateY(0);
+    transition: filter 200ms linear;
+  }
+
+  /* Left-side mask for improved contrast where the login card sits */
+  .login-left-mask {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 48%;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      rgba(6, 8, 15, 0.55),
+      rgba(6, 8, 15, 0.15)
+    );
+    mix-blend-mode: multiply;
   }
 
   .priority-high {

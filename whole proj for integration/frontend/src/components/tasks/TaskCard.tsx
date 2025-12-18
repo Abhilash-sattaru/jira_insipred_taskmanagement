@@ -104,6 +104,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
         className={cn(
           "p-4 cursor-pointer transition-all duration-200 hover:shadow-lg bg-card border-border/40",
           "glass-card",
+          "task-hover",
           isDragging && "task-card-dragging rotate-2",
           isOverdue && "border-destructive/50",
           "accent-strip"

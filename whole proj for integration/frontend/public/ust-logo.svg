@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#17C5AE" offset="0" />
+      <stop stop-color="#38BDF8" offset="1" />
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="20" fill="url(#g)" />
+  <g fill="#fff" font-family="Plus Jakarta Sans, system-ui, sans-serif" font-weight="700" font-size="48" text-anchor="middle" dominant-baseline="central">
+    <text x="80" y="86">UST</text>
+  </g>
+</svg>

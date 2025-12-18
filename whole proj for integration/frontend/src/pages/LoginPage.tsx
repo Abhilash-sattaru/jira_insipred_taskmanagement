@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,11 +61,100 @@ const LoginPage: React.FC = () => {
     { id: "4", role: "Developer", icon: Users, password: "dev123" },
   ];
 
+  // Parallax refs and handlers
+  const parallaxRef = useRef<HTMLDivElement | null>(null);
+  const blob1Ref = useRef<HTMLDivElement | null>(null);
+  const blob2Ref = useRef<HTMLDivElement | null>(null);
+  const blob3Ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let rafId = 0;
+    // tuning parameters
+    const scrollFactor = 0.18; // background translate factor
+    const blobFactors = [0.06, 0.04, 0.02]; // blobs vertical parallax multipliers
+    const maxBlur = 6; // px
+
+    const isDesktop = () => window.innerWidth >= 768;
+
+    const handleScroll = () => {
+      const y = window.scrollY || window.pageYOffset;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (parallaxRef.current) {
+          const translate = Math.round(y * scrollFactor);
+          parallaxRef.current.style.transform = `translateY(${translate}px)`;
+          const blur = Math.min(y / 120, maxBlur);
+          parallaxRef.current.style.filter = `blur(${blur}px)`;
+        }
+
+        // blobs subtle vertical parallax
+        const blobs = [blob1Ref.current, blob2Ref.current, blob3Ref.current];
+        blobs.forEach((b, i) => {
+          if (!b) return;
+          const t = Math.round(y * blobFactors[i]);
+          b.style.transform = `translateY(${t}px)`;
+        });
+      });
+    };
+
+    // pointer parallax (desktop only)
+    const handlePointer = (ev: PointerEvent) => {
+      if (!isDesktop()) return;
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = (ev.clientX - cx) / cx; // -1 .. 1
+      const dy = (ev.clientY - cy) / cy;
+
+      // small translate for background and blobs
+      if (parallaxRef.current) {
+        const tx = dx * 10; // px
+        const ty = dy * 10;
+        parallaxRef.current.style.transform = `translateY(${
+          (window.scrollY || 0) * scrollFactor
+        }px) translate(${tx}px, ${ty}px)`;
+      }
+      const blobElems = [blob1Ref.current, blob2Ref.current, blob3Ref.current];
+      blobElems.forEach((b, i) => {
+        if (!b) return;
+        const factor = (i + 1) * 6; // responsiveness per blob
+        const bx = dx * factor * (i + 1);
+        const by = dy * factor * (i + 1);
+        b.style.transform = `translate(${bx}px, ${
+          Math.round((window.scrollY || 0) * blobFactors[i]) + by
+        }px)`;
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("pointermove", handlePointer);
+    // initial
+    handleScroll();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("pointermove", handlePointer);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      {/* Parallax background layer (fixed). Uses the provided UST image in public/ */}
+      <div
+        ref={parallaxRef}
+        className="parallax-layer"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(6,8,15,0.15), rgba(6,8,15,0.05)), url('/ust%20bg.webp')",
+        }}
+      />
+
+      {/* Left mask for contrast on medium+ screens */}
+      <div className="hidden md:block login-left-mask" aria-hidden />
+
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
+          ref={(el) => (blob1Ref.current = el as HTMLDivElement | null)}
           className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
@@ -74,6 +163,7 @@ const LoginPage: React.FC = () => {
           transition={{ duration: 8, repeat: Infinity }}
         />
         <motion.div
+          ref={(el) => (blob2Ref.current = el as HTMLDivElement | null)}
           className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
@@ -82,6 +172,7 @@ const LoginPage: React.FC = () => {
           transition={{ duration: 10, repeat: Infinity }}
         />
         <motion.div
+          ref={(el) => (blob3Ref.current = el as HTMLDivElement | null)}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary/5"
           animate={{ rotate: 360 }}
           transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
@@ -94,17 +185,17 @@ const LoginPage: React.FC = () => {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-md px-4"
       >
-        <Card className="glass-strong shadow-xl border-border/50">
-          <CardHeader className="space-y-1 text-center pb-4">
+        <Card className="glass-strong shadow-2xl border-border/40 max-w-md mx-auto">
+          <CardHeader className="space-y-1 text-center pb-4 pt-6">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mb-4 shadow-glow"
+              transition={{ delay: 0.2, type: "spring", stiffness: 220 }}
+              className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-3 shadow-glow border border-border/30"
             >
-              <Briefcase className="w-8 h-8 text-primary-foreground" />
+              <Briefcase className="w-9 h-9 text-primary-foreground" />
             </motion.div>
-            <CardTitle className="text-2xl font-bold text-foreground">
+            <CardTitle className="text-2xl font-extrabold text-foreground">
               UST Employee Management
             </CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -160,8 +251,8 @@ const LoginPage: React.FC = () => {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing
+                    in...
                   </>
                 ) : (
                   "Sign In"
@@ -178,36 +269,48 @@ const LoginPage: React.FC = () => {
                 )
               </p>
               <div className="grid gap-2">
-                {demoCredentials.map((cred, index) => (
-                  <motion.button
-                    key={cred.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + index * 0.1 }}
-                    onClick={() => {
-                      setEmployeeId(cred.id);
-                      setPassword(cred.password ?? "");
-                    }}
-                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <cred.icon className="w-4 h-4 text-primary" />
+                {demoCredentials.map((cred, index) => {
+                  const Icon = cred.icon;
+                  return (
+                    <motion.button
+                      key={cred.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      onClick={() => {
+                        setEmployeeId(cred.id);
+                        setPassword(cred.password ?? "");
+                      }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary text-left transition-colors group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                          <Icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {cred.role}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {cred.id}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {cred.role}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {cred.id}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                      Click to fill
-                    </span>
-                  </motion.button>
-                ))}
+                      <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                        Click to fill
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Project details for clarity */}
+              <div className="mt-4 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Project: UST Employee Management
+                </p>
+                <p>Jira-inspired task management demo</p>
+                <p>Repo: Abhilash-sattaru/jira_insipred_taskmanagement</p>
               </div>
             </div>
           </CardContent>
