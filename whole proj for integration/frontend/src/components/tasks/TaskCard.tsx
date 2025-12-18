@@ -93,18 +93,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+      exit={{ opacity: 0, scale: 0.95 }}
       whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.18 }}
     >
       <Card
         onClick={onClick}
         className={cn(
-          "p-4 cursor-pointer transition-all duration-200 hover:shadow-md bg-card border-border/50",
+          "p-4 cursor-pointer transition-all duration-200 hover:shadow-lg bg-card border-border/40",
+          "glass-card",
           isDragging && "task-card-dragging rotate-2",
-          isOverdue && "border-destructive/50"
+          isOverdue && "border-destructive/50",
+          "accent-strip"
         )}
       >
         {/* Task ID & Priority */}
@@ -144,7 +146,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
         </div>
 
         {/* Title */}
-        <h4 className="font-medium text-foreground text-sm mb-2 line-clamp-2">
+        <h4 className="font-semibold text-foreground text-sm mb-2 line-clamp-2 text-gradient">
           {task.title}
         </h4>
 
@@ -155,17 +157,25 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
 
         {/* Meta Info */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Assignee removed by request (UI-only). */}
-
+          <div className="flex items-center gap-3">
             {/* Reviewer */}
             {reviewer && (
               <div
-                className="flex items-center gap-1"
+                className="flex items-center gap-2"
                 title={`Reviewer: ${reviewer.name}`}
               >
-                <div className="w-6 h-6 rounded-full bg-review/10 flex items-center justify-center">
-                  <User className="w-3 h-3 text-review" />
+                <Avatar>
+                  <AvatarFallback className="text-xs">
+                    {(reviewer.name || "?").charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-foreground">
+                    {reviewer.name || "Not assigned"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Reviewer
+                  </span>
                 </div>
               </div>
             )}

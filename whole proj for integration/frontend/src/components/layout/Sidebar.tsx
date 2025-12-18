@@ -69,7 +69,7 @@ const Sidebar: React.FC = () => {
       animate={{ width: collapsed ? 72 : 260 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className={cn(
-        "bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0",
+        "bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0 glass-card",
         !collapsed && "shadow-lg"
       )}
     >
@@ -115,19 +115,20 @@ const Sidebar: React.FC = () => {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative overflow-hidden",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}
             >
-              {isActive && (
-                <motion.div
-                  layoutId="activeNav"
-                  className="absolute left-0 w-1 h-6 bg-sidebar-primary rounded-r-full"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-              )}
+              {/* Decorative colored strip when active (visual only) */}
+              <div
+                aria-hidden
+                className={cn(
+                  "absolute left-0 top-2 bottom-2 w-1 rounded-r-lg",
+                  isActive ? "bg-sidebar-primary" : ""
+                )}
+              />
               <item.icon
                 className={cn(
                   "w-5 h-5 flex-shrink-0 transition-transform duration-200",
@@ -185,7 +186,7 @@ const Sidebar: React.FC = () => {
       {/* Collapse Toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-2 top-24 w-7 h-7 rounded-full bg-card border border-border shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute -right-3 top-24 w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/60 border border-border shadow-md flex items-center justify-center text-primary-foreground hover:scale-105 transition-transform"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? (

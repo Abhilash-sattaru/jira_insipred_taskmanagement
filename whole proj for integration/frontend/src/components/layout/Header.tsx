@@ -71,29 +71,36 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 flex items-center justify-between px-6">
+    <header className="h-20 border-b border-border glass-card sticky top-0 z-40 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
-        <h2 className="text-lg font-semibold text-foreground">
-          Welcome back,{" "}
-          <span className="text-primary">
+        <div className="flex flex-col leading-tight">
+          <h2 className="text-lg font-bold text-foreground">Welcome back,</h2>
+          <span className="text-2xl font-extrabold text-gradient -mt-1">
             {user?.employee?.name?.split(" ")[0] || "User"}
           </span>
-        </h2>
+        </div>
       </div>
 
       {/* Centered app title (visual only, non-interactive) */}
       <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
-        <span className="text-sm font-bold text-foreground/90">
+        <span
+          className="text-sm font-bold text-foreground/80 bg-clip-text text-transparent"
+          style={{
+            backgroundImage:
+              "linear-gradient(90deg, rgba(23,197,174,1), rgba(56,189,248,1))",
+          }}
+        >
           UST Employee Management
         </span>
       </div>
+
       <div className="flex items-center gap-3">
         {/* Theme Toggle */}
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          className="w-9 h-9 rounded-lg hover:bg-secondary"
+          className="w-10 h-10 rounded-lg hover:bg-secondary action-glow"
         >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -104,9 +111,9 @@ const Header: React.FC = () => {
               transition={{ duration: 0.2 }}
             >
               {theme === "light" ? (
-                <Eye className="w-5 h-5 text-muted-foreground" />
+                <Sun className="w-5 h-5 text-muted-foreground" />
               ) : (
-                <Eye className="w-5 h-5 text-primary" />
+                <Moon className="w-5 h-5 text-primary" />
               )}
             </motion.div>
           </AnimatePresence>
@@ -118,7 +125,7 @@ const Header: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="w-9 h-9 rounded-lg hover:bg-secondary relative"
+              className="w-10 h-10 rounded-lg hover:bg-secondary relative action-glow"
             >
               <Bell className="w-5 h-5 text-muted-foreground" />
               {unreadCount > 0 && (

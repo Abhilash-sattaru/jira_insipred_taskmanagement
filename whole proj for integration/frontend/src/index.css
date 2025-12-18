@@ -185,6 +185,32 @@
 }
 
 @layer utilities {
+  /* Left accent strip for cards/tasks */
+  .accent-strip {
+    position: relative;
+  }
+
+  .accent-strip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 6px;
+    border-radius: 4px;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary)),
+      hsl(var(--accent))
+    );
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  }
+
+  /* A subtle glass-card utility for a more modern feel */
+  .glass-card {
+    @apply glass rounded-xl p-4 border-border/40 shadow-card;
+    background-image: var(--gradient-glass);
+  }
   .glass {
     @apply backdrop-blur-xl bg-card/80 border border-border/50;
   }
@@ -236,6 +262,12 @@
 
   .status-done {
     @apply bg-done/10 text-done border-done/30;
+  }
+
+  /* stronger hover for action buttons */
+  .action-glow:hover {
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
   }
 
   .priority-high {
