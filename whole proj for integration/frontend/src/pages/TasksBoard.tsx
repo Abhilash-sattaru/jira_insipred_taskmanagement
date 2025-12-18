@@ -10,7 +10,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { Task, TaskStatus } from "@/types";
-import { mockEmployees } from "@/data/mockData";
 import TaskCard from "@/components/tasks/TaskCard";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import TaskDetailModal from "@/components/tasks/TaskDetailModal";
@@ -18,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, empIdEquals } from "@/lib/utils";
 
 const columns: { id: TaskStatus; title: string; color: string }[] = [
   { id: "TO_DO", title: "To Do", color: "todo" },
@@ -32,30 +31,46 @@ const TasksBoard: React.FC = () => {
   const { tasks, updateTaskStatus } = useTasks();
   const { addNotification } = useNotifications();
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | TaskStatus | "OVERDUE"
+  >("ALL");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Filter tasks based on role and search
-  const filteredTasks = tasks.filter((task) => {
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter tasks based on role, search and UI filters
+  const filteredTasks = tasks
+    .filter((task) => {
+      const matchesSearch =
+        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Admin sees all, Manager sees their team's tasks, Developer sees assigned tasks
-    if (hasRole("ADMIN")) return matchesSearch;
-    if (hasRole("MANAGER")) {
-      return (
-        matchesSearch &&
-        (task.created_by === user?.e_id ||
-          task.assigned_by === user?.e_id ||
-          task.reviewer === user?.e_id ||
-          task.assigned_to === user?.e_id)
-      );
-    }
-    return matchesSearch && task.assigned_to === user?.e_id;
-  });
-
+      // Role-based visibility
+      if (hasRole("ADMIN")) return matchesSearch;
+      if (hasRole("MANAGER")) {
+        return (
+          matchesSearch &&
+          (task.created_by === user?.e_id ||
+            task.assigned_by === user?.e_id ||
+            task.reviewer === user?.e_id ||
+            empIdEquals(task.assigned_to, user?.e_id))
+        );
+      }
+      return matchesSearch && empIdEquals(task.assigned_to, user?.e_id);
+    })
+    .filter((task) => {
+      // Status filter
+      if (statusFilter === "ALL") return true;
+      if (statusFilter === "OVERDUE") {
+        if (!task.expected_closure) return false;
+        const raw = task.expected_closure;
+        const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+        const d = dateOnly ? new Date(raw + "T23:59:59") : new Date(raw);
+        if (isNaN(d.getTime())) return false;
+        return d < new Date() && task.status !== "DONE";
+      }
+      return task.status === statusFilter;
+    });
   const priorityRank: Record<string, number> = {
     HIGH: 0,
     MEDIUM: 1,
@@ -178,6 +193,20 @@ const TasksBoard: React.FC = () => {
               className="pl-9 w-64 bg-secondary/50"
             />
           </div>
+          {/* Filters */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="bg-secondary/50 text-sm px-2 py-1 rounded"
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All status</option>
+            <option value="TO_DO">To Do</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="REVIEW">Review</option>
+            <option value="DONE">Done</option>
+            <option value="OVERDUE">Overdue</option>
+          </select>
           {(hasRole("ADMIN") || hasRole("MANAGER")) && (
             <Button onClick={() => setCreateModalOpen(true)} className="gap-2">
               <Plus className="w-4 h-4" />

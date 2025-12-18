@@ -1,15 +1,15 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { useTasks } from '@/contexts/TaskContext';
-import { mockEmployees } from '@/data/mockData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import React from "react";
+import { motion } from "framer-motion";
+import { useTasks } from "@/contexts/TaskContext";
+import { mockEmployees } from "@/data/mockData";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -19,7 +19,7 @@ import {
   Legend,
   AreaChart,
   Area,
-} from 'recharts';
+} from "recharts";
 import {
   BarChart3,
   TrendingUp,
@@ -27,60 +27,117 @@ import {
   ListTodo,
   CheckCircle2,
   Clock,
-} from 'lucide-react';
+} from "lucide-react";
+import { empIdEquals } from "@/lib/utils";
 
 const AnalyticsPage: React.FC = () => {
   const { tasks } = useTasks();
 
   // Task stats by status
   const statusData = [
-    { name: 'To Do', value: tasks.filter(t => t.status === 'TO_DO').length, fill: 'hsl(217, 91%, 60%)' },
-    { name: 'In Progress', value: tasks.filter(t => t.status === 'IN_PROGRESS').length, fill: 'hsl(45, 93%, 47%)' },
-    { name: 'Review', value: tasks.filter(t => t.status === 'REVIEW').length, fill: 'hsl(25, 95%, 53%)' },
-    { name: 'Done', value: tasks.filter(t => t.status === 'DONE').length, fill: 'hsl(142, 76%, 36%)' },
+    {
+      name: "To Do",
+      value: tasks.filter((t) => t.status === "TO_DO").length,
+      fill: "hsl(217, 91%, 60%)",
+    },
+    {
+      name: "In Progress",
+      value: tasks.filter((t) => t.status === "IN_PROGRESS").length,
+      fill: "hsl(45, 93%, 47%)",
+    },
+    {
+      name: "Review",
+      value: tasks.filter((t) => t.status === "REVIEW").length,
+      fill: "hsl(25, 95%, 53%)",
+    },
+    {
+      name: "Done",
+      value: tasks.filter((t) => t.status === "DONE").length,
+      fill: "hsl(142, 76%, 36%)",
+    },
   ];
 
   // Priority breakdown
   const priorityData = [
-    { name: 'High', value: tasks.filter(t => t.priority === 'HIGH').length, color: 'hsl(0, 84%, 60%)' },
-    { name: 'Medium', value: tasks.filter(t => t.priority === 'MEDIUM').length, color: 'hsl(38, 92%, 50%)' },
-    { name: 'Low', value: tasks.filter(t => t.priority === 'LOW').length, color: 'hsl(142, 76%, 36%)' },
+    {
+      name: "High",
+      value: tasks.filter((t) => t.priority === "HIGH").length,
+      color: "hsl(0, 84%, 60%)",
+    },
+    {
+      name: "Medium",
+      value: tasks.filter((t) => t.priority === "MEDIUM").length,
+      color: "hsl(38, 92%, 50%)",
+    },
+    {
+      name: "Low",
+      value: tasks.filter((t) => t.priority === "LOW").length,
+      color: "hsl(142, 76%, 36%)",
+    },
   ];
 
   // Tasks per employee
-  const employeeData = mockEmployees.slice(0, 6).map(emp => ({
-    name: emp.name.split(' ')[0],
-    tasks: tasks.filter(t => t.assigned_to === emp.e_id).length,
-    completed: tasks.filter(t => t.assigned_to === emp.e_id && t.status === 'DONE').length,
+  const employeeData = mockEmployees.slice(0, 6).map((emp) => ({
+    name: emp.name.split(" ")[0],
+    tasks: tasks.filter((t) => empIdEquals(t.assigned_to, emp.e_id)).length,
+    completed: tasks.filter(
+      (t) => empIdEquals(t.assigned_to, emp.e_id) && t.status === "DONE"
+    ).length,
   }));
 
   // Weekly trend (mock data)
   const weeklyTrend = [
-    { day: 'Mon', created: 3, completed: 2 },
-    { day: 'Tue', created: 5, completed: 4 },
-    { day: 'Wed', created: 2, completed: 3 },
-    { day: 'Thu', created: 4, completed: 2 },
-    { day: 'Fri', created: 6, completed: 5 },
-    { day: 'Sat', created: 1, completed: 3 },
-    { day: 'Sun', created: 0, completed: 1 },
+    { day: "Mon", created: 3, completed: 2 },
+    { day: "Tue", created: 5, completed: 4 },
+    { day: "Wed", created: 2, completed: 3 },
+    { day: "Thu", created: 4, completed: 2 },
+    { day: "Fri", created: 6, completed: 5 },
+    { day: "Sat", created: 1, completed: 3 },
+    { day: "Sun", created: 0, completed: 1 },
   ];
 
   // Department distribution
   const departmentData = [
-    { name: 'Engineering', value: 4 },
-    { name: 'Infrastructure', value: 2 },
-    { name: 'Quality', value: 2 },
-    { name: 'Design', value: 1 },
-    { name: 'IT', value: 1 },
+    { name: "Engineering", value: 4 },
+    { name: "Infrastructure", value: 2 },
+    { name: "Quality", value: 2 },
+    { name: "Design", value: 1 },
+    { name: "IT", value: 1 },
   ];
 
-  const COLORS = ['hsl(250, 84%, 60%)', 'hsl(217, 91%, 60%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)'];
+  const COLORS = [
+    "hsl(250, 84%, 60%)",
+    "hsl(217, 91%, 60%)",
+    "hsl(142, 76%, 36%)",
+    "hsl(38, 92%, 50%)",
+    "hsl(0, 84%, 60%)",
+  ];
 
   const stats = [
-    { title: 'Total Tasks', value: tasks.length, icon: ListTodo, color: 'text-primary' },
-    { title: 'Completed', value: tasks.filter(t => t.status === 'DONE').length, icon: CheckCircle2, color: 'text-done' },
-    { title: 'In Progress', value: tasks.filter(t => t.status === 'IN_PROGRESS').length, icon: Clock, color: 'text-inprogress' },
-    { title: 'Team Members', value: mockEmployees.length, icon: Users, color: 'text-info' },
+    {
+      title: "Total Tasks",
+      value: tasks.length,
+      icon: ListTodo,
+      color: "text-primary",
+    },
+    {
+      title: "Completed",
+      value: tasks.filter((t) => t.status === "DONE").length,
+      icon: CheckCircle2,
+      color: "text-done",
+    },
+    {
+      title: "In Progress",
+      value: tasks.filter((t) => t.status === "IN_PROGRESS").length,
+      icon: Clock,
+      color: "text-inprogress",
+    },
+    {
+      title: "Team Members",
+      value: mockEmployees.length,
+      icon: Users,
+      color: "text-info",
+    },
   ];
 
   return (
@@ -90,7 +147,9 @@ const AnalyticsPage: React.FC = () => {
           <BarChart3 className="w-6 h-6 text-primary" />
           Analytics
         </h1>
-        <p className="text-muted-foreground">Track task progress and team performance</p>
+        <p className="text-muted-foreground">
+          Track task progress and team performance
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -106,10 +165,16 @@ const AnalyticsPage: React.FC = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <p className="text-3xl font-bold text-foreground mt-1">{stat.value}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {stat.title}
+                    </p>
+                    <p className="text-3xl font-bold text-foreground mt-1">
+                      {stat.value}
+                    </p>
                   </div>
-                  <div className={`w-12 h-12 rounded-xl bg-secondary flex items-center justify-center ${stat.color}`}>
+                  <div
+                    className={`w-12 h-12 rounded-xl bg-secondary flex items-center justify-center ${stat.color}`}
+                  >
                     <stat.icon className="w-6 h-6" />
                   </div>
                 </div>
@@ -138,14 +203,24 @@ const AnalyticsPage: React.FC = () => {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={statusData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
                       }}
                     />
                     <Bar dataKey="value" radius={[8, 8, 0, 0]} />
@@ -178,7 +253,9 @@ const AnalyticsPage: React.FC = () => {
                       outerRadius={100}
                       paddingAngle={5}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {priorityData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -186,9 +263,9 @@ const AnalyticsPage: React.FC = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
                       }}
                     />
                   </PieChart>
@@ -212,19 +289,43 @@ const AnalyticsPage: React.FC = () => {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={weeklyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis
+                      dataKey="day"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
                       }}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="created" stackId="1" stroke="hsl(217, 91%, 60%)" fill="hsl(217, 91%, 60% / 0.3)" name="Created" />
-                    <Area type="monotone" dataKey="completed" stackId="2" stroke="hsl(142, 76%, 36%)" fill="hsl(142, 76%, 36% / 0.3)" name="Completed" />
+                    <Area
+                      type="monotone"
+                      dataKey="created"
+                      stackId="1"
+                      stroke="hsl(217, 91%, 60%)"
+                      fill="hsl(217, 91%, 60% / 0.3)"
+                      name="Created"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="completed"
+                      stackId="2"
+                      stroke="hsl(142, 76%, 36%)"
+                      fill="hsl(142, 76%, 36% / 0.3)"
+                      name="Completed"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -246,19 +347,42 @@ const AnalyticsPage: React.FC = () => {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={employeeData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} width={80} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis
+                      type="number"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      width={80}
+                    />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="tasks" fill="hsl(250, 84%, 60%)" name="Assigned" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="completed" fill="hsl(142, 76%, 36%)" name="Completed" radius={[0, 4, 4, 0]} />
+                    <Bar
+                      dataKey="tasks"
+                      fill="hsl(250, 84%, 60%)"
+                      name="Assigned"
+                      radius={[0, 4, 4, 0]}
+                    />
+                    <Bar
+                      dataKey="completed"
+                      fill="hsl(142, 76%, 36%)"
+                      name="Completed"
+                      radius={[0, 4, 4, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -275,7 +399,9 @@ const AnalyticsPage: React.FC = () => {
       >
         <Card className="glass border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg">Team Distribution by Department</CardTitle>
+            <CardTitle className="text-lg">
+              Team Distribution by Department
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72">
@@ -290,14 +416,17 @@ const AnalyticsPage: React.FC = () => {
                     label={({ name, value }) => `${name}: ${value}`}
                   >
                     {departmentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
                     }}
                   />
                   <Legend />

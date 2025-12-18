@@ -41,6 +41,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { empIdEquals } from "@/lib/utils";
 
 interface TaskDetailModalProps {
   task: Task;
@@ -60,15 +61,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [employees, setEmployees] = useState(() => mockEmployees);
-  const assignee = employees.find(
-    (e) => String(e.e_id) === String(task.assigned_to)
-  );
-  const reviewer = employees.find(
-    (e) => String(e.e_id) === String(task.reviewer)
-  );
-  const creator = employees.find(
-    (e) => String(e.e_id) === String(task.created_by)
-  );
+  // assignee has been removed from UI per request; keep employees list for reviewer/creator lookups
+  const reviewer = employees.find((e) => empIdEquals(e.e_id, task.reviewer));
+  const creator = employees.find((e) => empIdEquals(e.e_id, task.created_by));
 
   // Manager-specific lists and local state for editable fields
   const managerId =
@@ -101,9 +96,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
   }, [token]);
 
-  const [selectedAssignee, setSelectedAssignee] = useState<string | undefined>(
-    task.assigned_to
-  );
   const [selectedReviewer, setSelectedReviewer] = useState<string | undefined>(
     task.reviewer
   );
@@ -243,11 +235,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  const canReview = task.reviewer === user?.e_id && task.status === "REVIEW";
+  const canReview =
+    empIdEquals(task.reviewer, user?.e_id) && task.status === "REVIEW";
   const canDelete = hasRole("ADMIN");
   const canMoveToReview =
     (hasRole("DEVELOPER") &&
-      task.assigned_to === user?.e_id &&
+      empIdEquals(task.assigned_to, user?.e_id) &&
       task.status === "IN_PROGRESS") ||
     (hasRole("ADMIN") && task.status === "IN_PROGRESS");
   const canAdmin = hasRole("ADMIN");
@@ -337,32 +330,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Assigned to:</span>
-                {hasRole("MANAGER") ? (
-                  <select
-                    value={selectedAssignee || ""}
-                    onChange={(e) => {
-                      const v = e.target.value || undefined;
-                      setSelectedAssignee(v);
-                      updateTask(task.t_id, { assigned_to: v });
-                    }}
-                    className="ml-2 text-sm p-1 border rounded"
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((m) => (
-                      <option key={m.e_id} value={m.e_id}>
-                        {m.name} ({m.e_id})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="font-medium text-foreground">
-                    {assignee?.name || "Unassigned"}
-                  </span>
-                )}
-              </div>
+              {/* Assigned-to UI removed */}
               <div className="flex items-center gap-2 text-sm">
                 <User className="w-4 h-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Reviewer:</span>

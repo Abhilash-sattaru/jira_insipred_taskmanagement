@@ -6,6 +6,7 @@ import { fetchEmployees } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Calendar,
   MessageSquare,
@@ -15,8 +16,8 @@ import {
   ArrowRight,
   ArrowDown,
 } from "lucide-react";
-import { format, isValid } from "date-fns";
-import { cn } from "@/lib/utils";
+import { format, isValid, formatDistanceToNowStrict } from "date-fns";
+import { cn, empIdEquals } from "@/lib/utils";
 
 interface TaskCardProps {
   task: Task;
@@ -54,29 +55,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
     };
   }, [token]);
 
-  const assignee = employees.find(
-    (e) => String(e.e_id) === String(task.assigned_to)
-  );
-  const reviewer = employees.find(
-    (e) => String(e.e_id) === String(task.reviewer)
-  );
-
-  // If the assignee matches the current authenticated user, prefer the
-  // avatar stored in the AuthContext (it updates on profile change). This
-  // avoids stale avatars in task cards when the user updates their profile.
-  const assigneeAvatar = (() => {
-    if (!assignee) return undefined;
-    try {
-      const userEid = user?.e_id;
-      // some places store numeric ids; normalize to string and compare
-      if (userEid && String(userEid) === String(assignee.e_id)) {
-        return user?.employee?.avatar ?? assignee.avatar;
-      }
-    } catch (e) {
-      // ignore
-    }
-    return assignee.avatar;
-  })();
+  const reviewer = employees.find((e) => empIdEquals(e.e_id, task.reviewer));
 
   const getPriorityIcon = () => {
     switch (task.priority) {
@@ -89,9 +68,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
     }
   };
 
-  const expectedClosureDate = task.expected_closure
-    ? new Date(task.expected_closure)
-    : null;
+  // Parse expected_closure; if it's a date-only string (YYYY-MM-DD), treat as end of day
+  let expectedClosureDate: Date | null = null;
+  if (task.expected_closure) {
+    const raw = task.expected_closure;
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+    try {
+      expectedClosureDate = dateOnly
+        ? new Date(raw + "T23:59:59")
+        : new Date(raw);
+    } catch (e) {
+      expectedClosureDate = null;
+    }
+  }
+
   const isExpectedClosureValid = expectedClosureDate
     ? !isNaN(expectedClosureDate.getTime()) && isValid(expectedClosureDate)
     : false;
@@ -112,7 +102,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
       <Card
         onClick={onClick}
         className={cn(
-          "p-3 cursor-pointer transition-all duration-200 hover:shadow-md bg-card border-border/50",
+          "p-4 cursor-pointer transition-all duration-200 hover:shadow-md bg-card border-border/50",
           isDragging && "task-card-dragging rotate-2",
           isOverdue && "border-destructive/50"
         )}
@@ -122,17 +112,35 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
           <span className="text-xs font-mono text-muted-foreground">
             {task.t_id}
           </span>
-          <span
-            className={cn(
-              "flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium",
-              task.priority === "HIGH" && "priority-high",
-              task.priority === "MEDIUM" && "priority-medium",
-              task.priority === "LOW" && "priority-low"
-            )}
-          >
-            {getPriorityIcon()}
-            {task.priority}
-          </span>
+
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium",
+                task.priority === "HIGH" && "priority-high",
+                task.priority === "MEDIUM" && "priority-medium",
+                task.priority === "LOW" && "priority-low"
+              )}
+            >
+              {getPriorityIcon()}
+              {task.priority}
+            </span>
+
+            <Badge
+              variant={
+                isOverdue
+                  ? "destructive"
+                  : task.status === "DONE"
+                  ? "secondary"
+                  : task.status === "REVIEW"
+                  ? "outline"
+                  : "default"
+              }
+              className="!px-2 !py-0.5 text-[11px]"
+            >
+              {isOverdue ? "OVERDUE" : task.status.replace("_", " ")}
+            </Badge>
+          </div>
         </div>
 
         {/* Title */}
@@ -148,17 +156,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
         {/* Meta Info */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Assignee */}
-            {assignee && (
-              <div className="flex items-center gap-1" title={assignee.name}>
-                <Avatar className="w-6 h-6">
-                  <AvatarImage src={assigneeAvatar} />
-                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                    {assignee.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-            )}
+            {/* Assignee removed by request (UI-only). */}
 
             {/* Reviewer */}
             {reviewer && (
@@ -182,7 +180,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
               </div>
             )}
 
-            {/* Due date */}
+            {/* Due date (date + time) */}
             <div
               className={cn(
                 "flex items-center gap-1 text-xs",
@@ -191,11 +189,21 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
             >
               {isOverdue && <AlertTriangle className="w-3 h-3" />}
               <Calendar className="w-3 h-3" />
-              <span>
-                {isExpectedClosureValid
-                  ? format(expectedClosureDate!, "MMM d")
-                  : "—"}
-              </span>
+              <div className="flex flex-col">
+                <span>
+                  {isExpectedClosureValid
+                    ? format(expectedClosureDate!, "MMM d, h:mm a")
+                    : "—"}
+                </span>
+                {isOverdue && isExpectedClosureValid && (
+                  <span className="text-[10px] text-destructive">
+                    Overdue ·{" "}
+                    {formatDistanceToNowStrict(expectedClosureDate!, {
+                      unit: "minute",
+                    })}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

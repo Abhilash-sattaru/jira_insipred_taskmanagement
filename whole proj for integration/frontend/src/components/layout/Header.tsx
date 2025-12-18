@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useNotifications } from '@/contexts/NotificationContext';
-import { Button } from '@/components/ui/button';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,13 +12,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import {
   Bell,
   Sun,
@@ -33,31 +33,37 @@ import {
   CheckCircle2,
   AlertCircle,
   UserPlus,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  } = useNotifications();
   const navigate = useNavigate();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'TASK_ASSIGNED':
+      case "TASK_ASSIGNED":
         return <UserPlus className="w-4 h-4 text-info" />;
-      case 'STATUS_CHANGED':
+      case "STATUS_CHANGED":
         return <AlertCircle className="w-4 h-4 text-warning" />;
-      case 'TASK_COMPLETED':
+      case "TASK_COMPLETED":
         return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case 'REMARK_ADDED':
+      case "REMARK_ADDED":
         return <MessageSquare className="w-4 h-4 text-primary" />;
       default:
         return <Bell className="w-4 h-4" />;
@@ -65,13 +71,22 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 flex items-center justify-between px-6">
+    <header className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
         <h2 className="text-lg font-semibold text-foreground">
-          Welcome back, <span className="text-primary">{user?.employee?.name?.split(' ')[0] || 'User'}</span>
+          Welcome back,{" "}
+          <span className="text-primary">
+            {user?.employee?.name?.split(" ")[0] || "User"}
+          </span>
         </h2>
       </div>
 
+      {/* Centered app title (visual only, non-interactive) */}
+      <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
+        <span className="text-sm font-bold text-foreground/90">
+          UST Employee Management
+        </span>
+      </div>
       <div className="flex items-center gap-3">
         {/* Theme Toggle */}
         <Button
@@ -88,7 +103,7 @@ const Header: React.FC = () => {
               exit={{ scale: 0, rotate: 180 }}
               transition={{ duration: 0.2 }}
             >
-              {theme === 'light' ? (
+              {theme === "light" ? (
                 <Eye className="w-5 h-5 text-muted-foreground" />
               ) : (
                 <Eye className="w-5 h-5 text-primary" />
@@ -112,7 +127,7 @@ const Header: React.FC = () => {
                   animate={{ scale: 1 }}
                   className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs font-medium flex items-center justify-center"
                 >
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </motion.span>
               )}
             </Button>
@@ -158,8 +173,8 @@ const Header: React.FC = () => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     className={cn(
-                      'p-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors',
-                      !notification.read && 'bg-primary/5'
+                      "p-3 border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors",
+                      !notification.read && "bg-primary/5"
                     )}
                     onClick={() => markAsRead(notification.id)}
                   >
@@ -168,10 +183,17 @@ const Header: React.FC = () => {
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{notification.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{notification.message}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {notification.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {notification.message}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(
+                            new Date(notification.created_at),
+                            { addSuffix: true }
+                          )}
                         </p>
                       </div>
                       {!notification.read && (
@@ -200,11 +222,11 @@ const Header: React.FC = () => {
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  user?.employee?.name?.charAt(0) || 'U'
+                  user?.employee?.name?.charAt(0) || "U"
                 )}
               </div>
               <span className="text-sm font-medium text-foreground hidden sm:inline">
-                {user?.employee?.name?.split(' ')[0] || 'User'}
+                {user?.employee?.name?.split(" ")[0] || "User"}
               </span>
             </Button>
           </DropdownMenuTrigger>
@@ -212,15 +234,17 @@ const Header: React.FC = () => {
             <DropdownMenuLabel>
               <div className="flex flex-col">
                 <span className="text-foreground">{user?.employee?.name}</span>
-                <span className="text-xs text-muted-foreground font-normal">{user?.employee?.email}</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  {user?.employee?.email}
+                </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/dashboard/profile')}>
+            <DropdownMenuItem onClick={() => navigate("/dashboard/profile")}>
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/dashboard/settings')}>
+            <DropdownMenuItem onClick={() => navigate("/dashboard/settings")}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </DropdownMenuItem>
