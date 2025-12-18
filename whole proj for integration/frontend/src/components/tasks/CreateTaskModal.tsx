@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchEmployees } from "@/lib/api";
+import { fetchEmployees, fetchMyEmployees } from "@/lib/api";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { mockEmployees } from "@/data/mockData";
@@ -34,7 +34,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { user, token } = useAuth();
+  const { user, token, hasRole } = useAuth();
   const { addTask } = useTasks();
   const { addNotification } = useNotifications();
 
@@ -48,9 +48,163 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     expected_closure: "",
   });
 
+  const [employees, setEmployees] = useState(() => mockEmployees);
+  const [reviewers, setReviewers] = useState(() =>
+    mockEmployees.filter((e) =>
+      (e.designation || "").toLowerCase().includes("manager")
+    )
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!token) {
+        if (hasRole("MANAGER") && user?.e_id) {
+          setEmployees(
+            mockEmployees.filter((e) => String(e.mgr_id) === String(user.e_id))
+          );
+        } else {
+          setEmployees(mockEmployees);
+        }
+        // reviewers from mock
+        setReviewers(
+          mockEmployees.filter((e) =>
+            (e.designation || "").toLowerCase().includes("manager")
+          )
+        );
+        return;
+      }
+
+      try {
+        // fetch assigned-to candidates
+        let data: any[] = [];
+        if (hasRole("MANAGER")) {
+          data = await fetchMyEmployees(token || null);
+        } else {
+          data = await fetchEmployees(token || null);
+        }
+
+        if (!mounted) return;
+        const mapped = Array.isArray(data)
+          ? data.map((e: any) => ({
+              ...e,
+              e_id: String(e.e_id),
+              mgr_id: e.mgr_id != null ? String(e.mgr_id) : undefined,
+            }))
+          : [];
+
+        if (hasRole("MANAGER") && user?.e_id) {
+          const userDigits = (String(user.e_id).match(/(\d+)/) || [])[0];
+          const idVariants = new Set<string>();
+          idVariants.add(String(user.e_id));
+          if (userDigits) {
+            const n = String(Number(userDigits));
+            idVariants.add(n);
+            idVariants.add(`EMP${String(Number(n)).padStart(3, "0")}`);
+          }
+          if (user.employee?.e_id) idVariants.add(String(user.employee.e_id));
+
+          const filtered = mapped.filter((emp: any) => {
+            const mgr = emp.mgr_id != null ? String(emp.mgr_id) : "";
+            for (const v of idVariants) {
+              if (!v) continue;
+              if (mgr === v) return true;
+            }
+            return false;
+          });
+          setEmployees(filtered);
+        } else {
+          setEmployees(mapped.length ? mapped : mockEmployees);
+        }
+
+        // build reviewers: try to fetch full list to get all managers
+        try {
+          const full: any = await fetchEmployees(token || null);
+          if (Array.isArray(full)) {
+            const fullMapped = full.map((e: any) => ({
+              ...e,
+              e_id: String(e.e_id),
+              mgr_id: e.mgr_id != null ? String(e.mgr_id) : undefined,
+            }));
+            let mgrs = fullMapped.filter(
+              (emp: any) =>
+                (emp.designation || "").toLowerCase().includes("manager") ||
+                (emp.designation || "").toLowerCase().includes("lead")
+            );
+            if (hasRole("MANAGER") && user?.e_id) {
+              const existing = new Set(mgrs.map((m: any) => String(m.e_id)));
+              if (!existing.has(String(user.e_id))) {
+                mgrs.unshift({
+                  e_id: String(user.e_id),
+                  name: user.employee?.name || `Manager ${user.e_id}`,
+                  designation: user.employee?.designation || "Manager",
+                });
+              }
+            }
+            const seen = new Set<string>();
+            const deduped = mgrs.filter((m: any) => {
+              if (seen.has(String(m.e_id))) return false;
+              seen.add(String(m.e_id));
+              return true;
+            });
+            setReviewers(deduped);
+          }
+        } catch (err) {
+          // fallback derive from mapped
+          const mgrs = (mapped.length ? mapped : mockEmployees).filter(
+            (emp: any) =>
+              (emp.designation || "").toLowerCase().includes("manager") ||
+              (emp.designation || "").toLowerCase().includes("lead")
+          );
+          if (hasRole("MANAGER") && user?.e_id) {
+            const exists = mgrs.some(
+              (m: any) => String(m.e_id) === String(user.e_id)
+            );
+            if (!exists) {
+              mgrs.unshift({
+                e_id: String(user.e_id),
+                name: user.employee?.name || `Manager ${user.e_id}`,
+                designation: user.employee?.designation || "Manager",
+              });
+            }
+          }
+          const seen = new Set<string>();
+          const deduped = mgrs.filter((m: any) => {
+            if (seen.has(String(m.e_id))) return false;
+            seen.add(String(m.e_id));
+            return true;
+          });
+          setReviewers(deduped);
+        }
+      } catch (err) {
+        console.warn(
+          "Failed to load employees for task assignment, using mock",
+          err
+        );
+        if (!mounted) return;
+        // fallback behavior
+        if (hasRole("MANAGER") && user?.e_id) {
+          setEmployees(
+            mockEmployees.filter((e) => String(e.mgr_id) === String(user.e_id))
+          );
+        } else {
+          setEmployees(mockEmployees);
+        }
+        setReviewers(
+          mockEmployees.filter((e) =>
+            (e.designation || "").toLowerCase().includes("manager")
+          )
+        );
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [token, hasRole, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (
       !formData.title.trim() ||
       !formData.description.trim() ||
@@ -63,13 +217,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       });
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-
       addTask({
         title: formData.title,
         description: formData.description,
@@ -84,7 +235,6 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         reviewer: formData.reviewer || undefined,
         expected_closure: formData.expected_closure,
       });
-
       if (formData.assigned_to) {
         addNotification({
           type: "TASK_ASSIGNED",
@@ -92,12 +242,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           message: `You have been assigned "${formData.title}"`,
         });
       }
-
       toast({
         title: "Task Created",
         description: "Task has been created successfully",
       });
-
       setFormData({
         title: "",
         description: "",
@@ -106,9 +254,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         reviewer: "",
         expected_closure: "",
       });
-
       onOpenChange(false);
-    } catch {
+    } catch (err) {
       toast({
         title: "Error",
         description: "Failed to create task",
@@ -119,45 +266,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   };
 
-  const [employees, setEmployees] = useState(() => mockEmployees);
-
-  React.useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!token) return setEmployees(mockEmployees);
-      try {
-        const data: any = await fetchEmployees(token || null);
-        if (!mounted) return;
-        if (Array.isArray(data)) {
-          setEmployees(
-            data.map((e: any) => ({
-              ...e,
-              e_id: String(e.e_id),
-              mgr_id: e.mgr_id != null ? String(e.mgr_id) : undefined,
-            }))
-          );
-        } else {
-          setEmployees(mockEmployees);
-        }
-      } catch (err) {
-        console.warn(
-          "Failed to load employees for task assignment, using mock",
-          err
-        );
-        if (mounted) setEmployees(mockEmployees);
-      }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [token]);
-
-  const managers = employees.filter(
-    (e) =>
-      (e.designation || "").toLowerCase().includes("manager") ||
-      (e.designation || "").toLowerCase().includes("lead")
-  );
+  const managerCandidates = reviewers; // reviewers is the list of managers to show in reviewer dropdown
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,7 +287,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               placeholder="Enter task title"
               value={formData.title}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, title: e.target.value }))
+                setFormData((p) => ({ ...p, title: e.target.value }))
               }
               className="bg-secondary/50"
             />
@@ -193,10 +302,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               placeholder="Enter task description"
               value={formData.description}
               onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
+                setFormData((p) => ({ ...p, description: e.target.value }))
               }
               className="bg-secondary/50 min-h-[100px]"
             />
@@ -210,7 +316,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               <Select
                 value={formData.priority}
                 onValueChange={(value: Priority) =>
-                  setFormData((prev) => ({ ...prev, priority: value }))
+                  setFormData((p) => ({ ...p, priority: value }))
                 }
               >
                 <SelectTrigger className="bg-secondary/50">
@@ -248,8 +354,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="date"
                 value={formData.expected_closure}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
+                  setFormData((p) => ({
+                    ...p,
                     expected_closure: e.target.value,
                   }))
                 }
@@ -264,7 +370,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               <Select
                 value={formData.assigned_to}
                 onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, assigned_to: value }))
+                  setFormData((p) => ({ ...p, assigned_to: value }))
                 }
               >
                 <SelectTrigger className="bg-secondary/50">
@@ -285,14 +391,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               <Select
                 value={formData.reviewer}
                 onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, reviewer: value }))
+                  setFormData((p) => ({ ...p, reviewer: value }))
                 }
               >
                 <SelectTrigger className="bg-secondary/50">
                   <SelectValue placeholder="Select reviewer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {managers.map((mgr) => (
+                  {managerCandidates.map((mgr: any) => (
                     <SelectItem key={mgr.e_id} value={String(mgr.e_id)}>
                       {mgr.name}
                     </SelectItem>

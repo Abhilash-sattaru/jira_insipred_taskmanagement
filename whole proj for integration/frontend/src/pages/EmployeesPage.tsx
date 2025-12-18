@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Employee } from "@/types";
@@ -72,69 +72,71 @@ const EmployeesPage: React.FC = () => {
   // employees loaded from API (fallback to mock data if API fails)
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
+  const [usingMockEmployees, setUsingMockEmployees] = React.useState(false);
+
+  const mountedRef = useRef(true);
+
+  const loadEmployees = useCallback(async () => {
+    setLoadingEmployees(true);
+    try {
+      let data: any[] = [];
+      if (hasRole("ADMIN")) {
+        data = await fetchEmployees(token || null);
+      } else {
+        data = await fetchMyEmployees(token || null);
+      }
+
+      // Normalize backend records to frontend `Employee` shape (strings for e_id/mgr_id)
+      if (mountedRef.current && Array.isArray(data)) {
+        setUsingMockEmployees(false);
+        const normalized = data.map((e: any) => ({
+          e_id:
+            e.e_id != null ? String(e.e_id) : e.id != null ? String(e.id) : "",
+          name: e.name || e.full_name || "",
+          email: e.email || "",
+          designation: e.designation || e.position || "",
+          mgr_id:
+            e.mgr_id != null
+              ? String(e.mgr_id)
+              : e.manager_id != null
+              ? String(e.manager_id)
+              : undefined,
+          avatar: e.avatar || e.profile_picture || "",
+          department: e.department || e.dept || "",
+        })) as Employee[];
+        setEmployees(normalized);
+      }
+    } catch (err) {
+      // fallback to mock data if API unavailable or fails
+      console.error(
+        "Failed to fetch employees from API, using mock data:",
+        err
+      );
+      toast({
+        title: "Error fetching employees",
+        description: (err as any)?.message || String(err),
+        variant: "destructive",
+      });
+      if (mountedRef.current) {
+        setUsingMockEmployees(true);
+        setEmployees(
+          hasRole("ADMIN")
+            ? mockEmployees
+            : getEmployeesByManager(user?.e_id || "")
+        );
+      }
+    } finally {
+      if (mountedRef.current) setLoadingEmployees(false);
+    }
+  }, [hasRole, user, token]);
 
   React.useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoadingEmployees(true);
-      try {
-        let data: any[] = [];
-        if (hasRole("ADMIN")) {
-          data = await fetchEmployees(token || null);
-        } else {
-          data = await fetchMyEmployees(token || null);
-        }
-
-        // Normalize backend records to frontend `Employee` shape (strings for e_id/mgr_id)
-        if (mounted && Array.isArray(data)) {
-          const normalized = data.map((e: any) => ({
-            e_id:
-              e.e_id != null
-                ? String(e.e_id)
-                : e.id != null
-                ? String(e.id)
-                : "",
-            name: e.name || e.full_name || "",
-            email: e.email || "",
-            designation: e.designation || e.position || "",
-            mgr_id:
-              e.mgr_id != null
-                ? String(e.mgr_id)
-                : e.manager_id != null
-                ? String(e.manager_id)
-                : undefined,
-            avatar: e.avatar || e.profile_picture || "",
-            department: e.department || e.dept || "",
-          })) as Employee[];
-          setEmployees(normalized);
-        }
-      } catch (err) {
-        // fallback to mock data if API unavailable or fails
-        console.error(
-          "Failed to fetch employees from API, using mock data:",
-          err
-        );
-        toast({
-          title: "Error fetching employees",
-          description: (err as any)?.message || String(err),
-          variant: "destructive",
-        });
-        if (mounted) {
-          setEmployees(
-            hasRole("ADMIN")
-              ? mockEmployees
-              : getEmployeesByManager(user?.e_id || "")
-          );
-        }
-      } finally {
-        if (mounted) setLoadingEmployees(false);
-      }
-    };
-    load();
+    mountedRef.current = true;
+    loadEmployees();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
-  }, [hasRole, user, token]);
+  }, [loadEmployees]);
 
   // Apply search filter
   const filtered = employees.filter(
@@ -181,16 +183,16 @@ const EmployeesPage: React.FC = () => {
           payload,
           token || null
         );
-        setEmployees((prev) =>
-          prev.map((e) => (String(e.e_id) === String(res.e_id) ? res : e))
-        );
+        // refresh canonical server list after successful update
+        await loadEmployees();
         toast({
           title: "Employee Updated",
           description: `${res.name} updated successfully`,
         });
       } else {
         const res = await createEmployee(payload, token || null);
-        setEmployees((prev) => [res, ...prev]);
+        // refresh canonical server list after successful create
+        await loadEmployees();
         toast({
           title: "Employee Added",
           description: `${res.name} added successfully`,
@@ -215,9 +217,8 @@ const EmployeesPage: React.FC = () => {
 
     try {
       await deleteEmployee(employee.e_id as any, token || null);
-      setEmployees((prev) =>
-        prev.filter((e) => String(e.e_id) !== String(employee.e_id))
-      );
+      // refresh canonical server list after delete
+      await loadEmployees();
       toast({
         title: "Employee Deleted",
         description: `${employee.name} has been deleted`,
@@ -421,6 +422,21 @@ const EmployeesPage: React.FC = () => {
           )}
         </div>
       </div>
+      {usingMockEmployees && (
+        <div className="p-3 rounded-md bg-yellow-50 border border-yellow-200 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-700 font-medium">Using mock data</span>
+            <span className="text-sm text-muted-foreground">
+              — failed to load employees from server
+            </span>
+          </div>
+          <div>
+            <Button variant="outline" onClick={() => loadEmployees()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
