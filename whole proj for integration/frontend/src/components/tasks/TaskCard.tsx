@@ -25,7 +25,7 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [employees, setEmployees] =
     React.useState<typeof mockEmployees>(mockEmployees);
 
@@ -60,6 +60,23 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
   const reviewer = employees.find(
     (e) => String(e.e_id) === String(task.reviewer)
   );
+
+  // If the assignee matches the current authenticated user, prefer the
+  // avatar stored in the AuthContext (it updates on profile change). This
+  // avoids stale avatars in task cards when the user updates their profile.
+  const assigneeAvatar = (() => {
+    if (!assignee) return undefined;
+    try {
+      const userEid = user?.e_id;
+      // some places store numeric ids; normalize to string and compare
+      if (userEid && String(userEid) === String(assignee.e_id)) {
+        return user?.employee?.avatar ?? assignee.avatar;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return assignee.avatar;
+  })();
 
   const getPriorityIcon = () => {
     switch (task.priority) {
@@ -135,7 +152,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isDragging, onClick }) => {
             {assignee && (
               <div className="flex items-center gap-1" title={assignee.name}>
                 <Avatar className="w-6 h-6">
-                  <AvatarImage src={assignee.avatar} />
+                  <AvatarImage src={assigneeAvatar} />
                   <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                     {assignee.name.charAt(0)}
                   </AvatarFallback>

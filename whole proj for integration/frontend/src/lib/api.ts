@@ -47,7 +47,7 @@ export function authHeaders(token?: string | null) {
 }
 
 export async function fetchTasks(token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/tasks`, {
+  const res = await fetch(`${BASE_URL}/api/tasks/`, {
     headers: {
       ...authHeaders(token),
       "Content-Type": "application/json",
@@ -58,7 +58,7 @@ export async function fetchTasks(token?: string | null) {
 }
 
 export async function createTaskAPI(payload: any, token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/tasks`, {
+  const res = await fetch(`${BASE_URL}/api/tasks/`, {
     method: "POST",
     headers: {
       ...authHeaders(token),
@@ -87,6 +87,49 @@ export async function patchTaskAPI(
   return res.json();
 }
 
+// Remarks
+export async function createRemarkAPI(
+  taskId: number | string,
+  comment: string,
+  token?: string | null
+) {
+  const params = new URLSearchParams();
+  params.set("task_id", String(taskId));
+  params.set("comment", comment);
+
+  const res = await fetch(`${BASE_URL}/api/remarks/?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    const msg = await parseErrorResponse(res);
+    throw new Error(msg || "Failed to create remark");
+  }
+  return res.json();
+}
+
+export async function fetchRemarksAPI(
+  taskId: number | string,
+  token?: string | null
+) {
+  const res = await fetch(`${BASE_URL}/api/remarks/task/${taskId}/`, {
+    headers: {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    const txt = await res
+      .text()
+      .catch(() => res.statusText || `HTTP ${res.status}`);
+    throw new Error(txt || "Failed to fetch remarks");
+  }
+  return res.json();
+}
+
 async function parseErrorResponse(res: Response): Promise<string> {
   try {
     const j = await res.json();
@@ -105,7 +148,7 @@ async function parseErrorResponse(res: Response): Promise<string> {
 
 // Employees
 export async function fetchEmployees(token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/employees`, {
+  const res = await fetch(`${BASE_URL}/api/employees/`, {
     headers: {
       ...authHeaders(token),
       "Content-Type": "application/json",
@@ -121,7 +164,7 @@ export async function fetchEmployees(token?: string | null) {
 }
 
 export async function fetchMyEmployees(token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/employees/me`, {
+  const res = await fetch(`${BASE_URL}/api/employees/me/`, {
     headers: {
       ...authHeaders(token),
       "Content-Type": "application/json",
@@ -137,7 +180,7 @@ export async function fetchMyEmployees(token?: string | null) {
 }
 
 export async function createEmployee(payload: any, token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/employees`, {
+  const res = await fetch(`${BASE_URL}/api/employees/`, {
     method: "POST",
     headers: {
       ...authHeaders(token),
@@ -157,7 +200,7 @@ export async function updateEmployee(
   payload: any,
   token?: string | null
 ) {
-  const res = await fetch(`${BASE_URL}/api/employees/${e_id}`, {
+  const res = await fetch(`${BASE_URL}/api/employees/${e_id}/`, {
     method: "PUT",
     headers: {
       ...authHeaders(token),
@@ -176,7 +219,7 @@ export async function deleteEmployee(
   e_id: string | number,
   token?: string | null
 ) {
-  const res = await fetch(`${BASE_URL}/api/employees/${e_id}`, {
+  const res = await fetch(`${BASE_URL}/api/employees/${e_id}/`, {
     method: "DELETE",
     headers: {
       ...authHeaders(token),
@@ -192,7 +235,7 @@ export async function deleteEmployee(
 
 // Users
 export async function fetchUsers(token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/users`, {
+  const res = await fetch(`${BASE_URL}/api/users/`, {
     headers: {
       ...authHeaders(token),
       "Content-Type": "application/json",
@@ -208,7 +251,7 @@ export async function fetchUsers(token?: string | null) {
 }
 
 export async function createUser(payload: any, token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/users`, {
+  const res = await fetch(`${BASE_URL}/api/users/`, {
     method: "POST",
     headers: {
       ...authHeaders(token),
@@ -228,7 +271,7 @@ export async function updateUser(
   payload: any,
   token?: string | null
 ) {
-  const res = await fetch(`${BASE_URL}/api/users/${e_id}`, {
+  const res = await fetch(`${BASE_URL}/api/users/${e_id}/`, {
     method: "PUT",
     headers: {
       ...authHeaders(token),
@@ -244,7 +287,7 @@ export async function updateUser(
 }
 
 export async function deleteUser(e_id: string | number, token?: string | null) {
-  const res = await fetch(`${BASE_URL}/api/users/${e_id}`, {
+  const res = await fetch(`${BASE_URL}/api/users/${e_id}/`, {
     method: "DELETE",
     headers: {
       ...authHeaders(token),

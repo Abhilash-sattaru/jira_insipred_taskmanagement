@@ -175,6 +175,16 @@ const EmployeesPage: React.FC = () => {
       return;
     }
 
+    // Frontend validation: backend enforces company email domain
+    if (!String(payload.email).toLowerCase().endsWith("@ust.com")) {
+      toast({
+        title: "Invalid Email",
+        description: "Email must belong to @ust.com domain",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (isEdit && selectedEmployee) {

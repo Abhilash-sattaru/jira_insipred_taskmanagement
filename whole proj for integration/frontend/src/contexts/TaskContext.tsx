@@ -8,7 +8,14 @@ import React, {
 } from "react";
 import { Task, TaskStatus, Remark } from "@/types";
 import { mockTasks } from "@/data/mockData";
-import { fetchTasks, createTaskAPI, patchTaskAPI } from "@/lib/api";
+import {
+  fetchTasks,
+  createTaskAPI,
+  patchTaskAPI,
+  fetchRemarksAPI,
+  createRemarkAPI,
+  fetchEmployees,
+} from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import confetti from "canvas-confetti";
 
@@ -37,9 +44,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [employeesMap, setEmployeesMap] = useState<Record<string, any>>({});
   const { token, hasRole } = useAuth();
 
-  // Load tasks from backend when token is available
+  // Load tasks from backend when token is available, including remarks
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -67,7 +75,55 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
           actual_closure: t.actual_closure,
           remarks: [],
         }));
-        if (mounted) setTasks(mapped);
+
+        // Fetch employees once so we can resolve remark authors, then fetch remarks
+        try {
+          let localEmpMap: Record<string, any> = {};
+          try {
+            const emps: any[] = await fetchEmployees(token);
+            if (Array.isArray(emps)) {
+              emps.forEach((e: any) => {
+                localEmpMap[String(e.e_id)] = e;
+              });
+            }
+            // persist the map for later use (e.g., when creating remarks)
+            setEmployeesMap(localEmpMap);
+          } catch (e) {
+            // ignore employee fetch failures
+            localEmpMap = {};
+          }
+
+          const withRemarks = await Promise.all(
+            mapped.map(async (mt) => {
+              try {
+                const m = String(mt.t_id).match(/(\d+)/);
+                const numericId = m ? Number(m[0]) : null;
+                if (!numericId) return mt;
+                const r = await fetchRemarksAPI(numericId, token);
+                const remarksArray = Array.isArray(r) ? r : [];
+                const normalized = remarksArray.map((rm: any) => ({
+                  id: rm._id || rm.id || `REM${Date.now()}`,
+                  task_id: String(rm.task_id || mt.t_id),
+                  user_id: String(rm.e_id ?? rm.user_id ?? ""),
+                  user_name:
+                    (localEmpMap[String(rm.e_id)] &&
+                      localEmpMap[String(rm.e_id)].name) ||
+                    rm.user_name ||
+                    "Unknown",
+                  content: rm.comment || rm.content || "",
+                  created_at: rm.created_at || new Date().toISOString(),
+                  attachment: rm.file_name || rm.attachment,
+                })) as Remark[];
+                return { ...mt, remarks: normalized } as Task;
+              } catch (e) {
+                return mt;
+              }
+            })
+          );
+          if (mounted) setTasks(withRemarks);
+        } catch (e) {
+          if (mounted) setTasks(mapped);
+        }
       } catch (err) {
         console.warn("Failed to load tasks from API, using mock data", err);
       }
@@ -262,19 +318,67 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
 
   const addRemark = useCallback(
     (taskId: string, remark: Omit<Remark, "id" | "created_at">) => {
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.t_id !== taskId) return t;
-          const newRemark: Remark = {
-            ...remark,
-            id: `REM${Date.now()}`,
-            created_at: new Date().toISOString(),
-          };
-          return { ...t, remarks: [...(t.remarks || []), newRemark] };
-        })
-      );
+      // Persist remark to backend when possible
+      (async () => {
+        if (token) {
+          try {
+            // attempt to post remark via API
+            // extract numeric id
+            const m = String(taskId).match(/(\d+)/);
+            const numericId = m ? Number(m[0]) : taskId;
+            const created = await createRemarkAPI(
+              numericId,
+              remark.content,
+              token
+            );
+            // expect backend returns created remark object
+            const createdRemark: Remark = {
+              id: created._id || created.id || `REM${Date.now()}`,
+              task_id: String(created.task_id || taskId),
+              user_id: String(
+                created.e_id ?? created.user_id ?? remark.user_id ?? ""
+              ),
+              user_name:
+                (employeesMap[String(created.e_id)] &&
+                  employeesMap[String(created.e_id)].name) ||
+                created.user_name ||
+                remark.user_name ||
+                "Unknown",
+              content: created.comment || created.content || remark.content,
+              created_at: created.created_at || new Date().toISOString(),
+              attachment: created.file_name || created.attachment,
+            };
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.t_id !== taskId
+                  ? t
+                  : { ...t, remarks: [...(t.remarks || []), createdRemark] }
+              )
+            );
+            return;
+          } catch (err) {
+            console.warn(
+              "Failed to persist remark to API, falling back to local",
+              err
+            );
+          }
+        }
+
+        // local fallback if API not available or failed
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.t_id !== taskId) return t;
+            const newRemark: Remark = {
+              ...remark,
+              id: `REM${Date.now()}`,
+              created_at: new Date().toISOString(),
+            };
+            return { ...t, remarks: [...(t.remarks || []), newRemark] };
+          })
+        );
+      })();
     },
-    []
+    [token, employeesMap]
   );
 
   const getTaskById = useCallback(

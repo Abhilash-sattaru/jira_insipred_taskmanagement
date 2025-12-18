@@ -524,13 +524,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 >
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                      {remark.user_name.charAt(0)}
+                      {(remark.user_name && remark.user_name.charAt(0)) || "U"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-foreground">
-                        {remark.user_name}
+                        {remark.user_name || "Unknown"}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {(() => {
