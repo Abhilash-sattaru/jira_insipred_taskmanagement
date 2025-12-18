@@ -59,6 +59,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const { addNotification } = useNotifications();
   const [newRemark, setNewRemark] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [employees, setEmployees] = useState(() => mockEmployees);
   // assignee has been removed from UI per request; keep employees list for reviewer/creator lookups
@@ -162,6 +163,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         user_id: user?.e_id || "",
         user_name: user?.employee?.name || "Unknown",
         content: newRemark,
+        attachmentFile: selectedFile || undefined,
       });
 
       addNotification({
@@ -177,6 +179,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       });
 
       setNewRemark("");
+      setSelectedFile(null);
     } catch {
       toast({
         title: "Error",
@@ -467,6 +470,18 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 className="bg-secondary/50 min-h-[60px]"
               />
               <div className="flex flex-col gap-2">
+                <input
+                  id="remark-file-input"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) =>
+                    setSelectedFile(
+                      e.target.files && e.target.files[0]
+                        ? e.target.files[0]
+                        : null
+                    )
+                  }
+                />
                 <Button
                   size="icon"
                   onClick={handleAddRemark}
@@ -474,9 +489,18 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 >
                   <Send className="w-4 h-4" />
                 </Button>
-                <Button size="icon" variant="outline">
-                  <Paperclip className="w-4 h-4" />
-                </Button>
+                <label htmlFor="remark-file-input">
+                  <Button size="icon" variant="outline" asChild>
+                    <span>
+                      <Paperclip className="w-4 h-4" />
+                    </span>
+                  </Button>
+                </label>
+                {selectedFile && (
+                  <div className="text-xs text-muted-foreground truncate max-w-[120px]">
+                    {selectedFile.name}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -515,9 +539,40 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       {remark.content}
                     </p>
                     {remark.attachment && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-primary">
+                      <div className="mt-2 flex items-center gap-2 text-xs text-primary">
                         <Paperclip className="w-3 h-3" />
-                        <span>Attachment</span>
+                        <span
+                          className="underline cursor-pointer"
+                          onClick={async () => {
+                            try {
+                              if (!remark.file_id) {
+                                // no file_id available, nothing to download
+                                return;
+                              }
+                              const { blob, filename } = await (
+                                await import("@/lib/api")
+                              ).downloadFile(
+                                remark.file_id,
+                                (
+                                  await import("@/contexts/AuthContext")
+                                ).useAuth().token
+                              );
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download =
+                                filename || remark.attachment || "download";
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              window.URL.revokeObjectURL(url);
+                            } catch (e) {
+                              console.error("Download failed", e);
+                            }
+                          }}
+                        >
+                          {remark.attachment}
+                        </span>
                       </div>
                     )}
                   </div>

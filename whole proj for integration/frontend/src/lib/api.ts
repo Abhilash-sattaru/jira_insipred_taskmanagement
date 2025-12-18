@@ -111,6 +111,54 @@ export async function createRemarkAPI(
   return res.json();
 }
 
+export async function createRemarkWithFile(
+  taskId: number | string,
+  comment: string,
+  file: File | null,
+  token?: string | null
+) {
+  // Use multipart/form-data when sending files
+  const form = new FormData();
+  form.append("task_id", String(taskId));
+  form.append("comment", comment);
+  if (file) form.append("file", file, file.name);
+
+  const res = await fetch(`${BASE_URL}/api/remarks/with-file`, {
+    method: "POST",
+    headers: {
+      // don't set Content-Type; browser will set multipart boundary
+      ...authHeaders(token),
+    },
+    body: form,
+  });
+  if (!res.ok) {
+    const msg = await parseErrorResponse(res);
+    throw new Error(msg || "Failed to create remark with file");
+  }
+  return res.json();
+}
+
+export async function downloadFile(fileId: string, token?: string | null) {
+  const res = await fetch(`${BASE_URL}/api/files/${fileId}`, {
+    headers: {
+      ...authHeaders(token),
+    },
+  });
+  if (!res.ok) {
+    const txt = await res
+      .text()
+      .catch(() => res.statusText || `HTTP ${res.status}`);
+    throw new Error(txt || "Failed to download file");
+  }
+  const blob = await res.blob();
+  // try to infer filename from headers
+  const disposition = res.headers.get("Content-Disposition") || "";
+  let filename = "download";
+  const m = disposition.match(/filename=(?:"?)([^";]+)/);
+  if (m) filename = m[1];
+  return { blob, filename };
+}
+
 export async function fetchRemarksAPI(
   taskId: number | string,
   token?: string | null

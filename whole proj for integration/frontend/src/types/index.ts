@@ -1,7 +1,7 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'DEVELOPER';
-export type TaskStatus = 'TO_DO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
-export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
-export type UserStatus = 'ACTIVE' | 'INACTIVE';
+export type Role = "ADMIN" | "MANAGER" | "DEVELOPER";
+export type TaskStatus = "TO_DO" | "IN_PROGRESS" | "REVIEW" | "DONE";
+export type Priority = "HIGH" | "MEDIUM" | "LOW";
+export type UserStatus = "ACTIVE" | "INACTIVE";
 
 export interface Employee {
   e_id: string;
@@ -47,11 +47,12 @@ export interface Remark {
   content: string;
   created_at: string;
   attachment?: string;
+  file_id?: string | null;
 }
 
 export interface Notification {
   id: string;
-  type: 'TASK_ASSIGNED' | 'STATUS_CHANGED' | 'TASK_COMPLETED' | 'REMARK_ADDED';
+  type: "TASK_ASSIGNED" | "STATUS_CHANGED" | "TASK_COMPLETED" | "REMARK_ADDED";
   title: string;
   message: string;
   task_id?: string;

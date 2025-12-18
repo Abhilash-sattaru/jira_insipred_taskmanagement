@@ -14,6 +14,7 @@ import {
   patchTaskAPI,
   fetchRemarksAPI,
   createRemarkAPI,
+  createRemarkWithFile,
   fetchEmployees,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,8 +33,8 @@ interface TaskContextType {
   ) => void;
   addRemark: (
     taskId: string,
-    remark: Omit<Remark, "id" | "created_at">
-  ) => void;
+    remark: Omit<Remark, "id" | "created_at"> & { attachmentFile?: File | null }
+  ) => Promise<void>;
   getTaskById: (taskId: string) => Task | undefined;
   getTasksByStatus: (status: TaskStatus) => Task[];
 }
@@ -113,6 +114,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
                   content: rm.comment || rm.content || "",
                   created_at: rm.created_at || new Date().toISOString(),
                   attachment: rm.file_name || rm.attachment,
+                  file_id: rm.file_id || null,
                 })) as Remark[];
                 return { ...mt, remarks: normalized } as Task;
               } catch (e) {
@@ -317,66 +319,77 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   const addRemark = useCallback(
-    (taskId: string, remark: Omit<Remark, "id" | "created_at">) => {
+    async (
+      taskId: string,
+      remark: Omit<Remark, "id" | "created_at"> & {
+        attachmentFile?: File | null;
+      }
+    ) => {
       // Persist remark to backend when possible
-      (async () => {
-        if (token) {
-          try {
-            // attempt to post remark via API
-            // extract numeric id
-            const m = String(taskId).match(/(\d+)/);
-            const numericId = m ? Number(m[0]) : taskId;
-            const created = await createRemarkAPI(
+      if (token) {
+        try {
+          // attempt to post remark via API
+          // extract numeric id
+          const m = String(taskId).match(/(\d+)/);
+          const numericId = m ? Number(m[0]) : taskId;
+          // If we have an attachment file, use multipart endpoint
+          let created: any;
+          if (remark.attachmentFile) {
+            created = await createRemarkWithFile(
               numericId,
               remark.content,
+              remark.attachmentFile,
               token
             );
-            // expect backend returns created remark object
-            const createdRemark: Remark = {
-              id: created._id || created.id || `REM${Date.now()}`,
-              task_id: String(created.task_id || taskId),
-              user_id: String(
-                created.e_id ?? created.user_id ?? remark.user_id ?? ""
-              ),
-              user_name:
-                (employeesMap[String(created.e_id)] &&
-                  employeesMap[String(created.e_id)].name) ||
-                created.user_name ||
-                remark.user_name ||
-                "Unknown",
-              content: created.comment || created.content || remark.content,
-              created_at: created.created_at || new Date().toISOString(),
-              attachment: created.file_name || created.attachment,
-            };
-            setTasks((prev) =>
-              prev.map((t) =>
-                t.t_id !== taskId
-                  ? t
-                  : { ...t, remarks: [...(t.remarks || []), createdRemark] }
-              )
-            );
-            return;
-          } catch (err) {
-            console.warn(
-              "Failed to persist remark to API, falling back to local",
-              err
-            );
+          } else {
+            created = await createRemarkAPI(numericId, remark.content, token);
           }
+          // expect backend returns created remark object
+          const createdRemark: Remark = {
+            id: created._id || created.id || `REM${Date.now()}`,
+            task_id: String(created.task_id || taskId),
+            user_id: String(
+              created.e_id ?? created.user_id ?? remark.user_id ?? ""
+            ),
+            user_name:
+              (employeesMap[String(created.e_id)] &&
+                employeesMap[String(created.e_id)].name) ||
+              created.user_name ||
+              remark.user_name ||
+              "Unknown",
+            content: created.comment || created.content || remark.content,
+            created_at: created.created_at || new Date().toISOString(),
+            attachment: created.file_name || created.attachment,
+            file_id: created.file_id || null,
+          };
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.t_id !== taskId
+                ? t
+                : { ...t, remarks: [...(t.remarks || []), createdRemark] }
+            )
+          );
+          return;
+        } catch (err) {
+          console.warn(
+            "Failed to persist remark to API, falling back to local",
+            err
+          );
         }
+      }
 
-        // local fallback if API not available or failed
-        setTasks((prev) =>
-          prev.map((t) => {
-            if (t.t_id !== taskId) return t;
-            const newRemark: Remark = {
-              ...remark,
-              id: `REM${Date.now()}`,
-              created_at: new Date().toISOString(),
-            };
-            return { ...t, remarks: [...(t.remarks || []), newRemark] };
-          })
-        );
-      })();
+      // local fallback if API not available or failed
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.t_id !== taskId) return t;
+          const newRemark: Remark = {
+            ...remark,
+            id: `REM${Date.now()}`,
+            created_at: new Date().toISOString(),
+          };
+          return { ...t, remarks: [...(t.remarks || []), newRemark] };
+        })
+      );
     },
     [token, employeesMap]
   );
