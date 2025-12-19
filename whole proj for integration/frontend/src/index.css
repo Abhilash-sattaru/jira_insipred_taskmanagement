@@ -210,12 +210,13 @@
   }
 
   /* A subtle glass-card utility for a more modern feel */
+  .glass {
+    @apply backdrop-blur-xl bg-card/80 border border-border/50;
+  }
+
   .glass-card {
     @apply glass rounded-xl p-4 border-border/40 shadow-card;
     background-image: var(--gradient-glass);
-  }
-  .glass {
-    @apply backdrop-blur-xl bg-card/80 border border-border/50;
   }
 
   .glass-strong {

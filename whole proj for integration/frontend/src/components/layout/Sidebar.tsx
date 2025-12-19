@@ -10,7 +10,6 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Briefcase,
   BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,11 +65,11 @@ const Sidebar: React.FC = () => {
   return (
     <motion.aside
       initial={false}
-      animate={{ width: collapsed ? 72 : 260 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
+      animate={{ width: collapsed ? 72 : 220 }}
+      transition={{ duration: 0.28, ease: "easeInOut" }}
       className={cn(
         "bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0 glass-card",
-        !collapsed && "shadow-lg"
+        !collapsed && "shadow-md"
       )}
     >
       {/* Logo Section */}
@@ -83,22 +82,30 @@ const Sidebar: React.FC = () => {
               exit={{ opacity: 0 }}
               className="flex items-center gap-3"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
-                <Briefcase className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center shadow-md overflow-hidden">
+                <img
+                  src="/ust-logo.svg"
+                  alt="UST"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
-                <h1 className="font-bold text-sidebar-foreground text-sm">
-                  UST Employee
+                <h1 className="font-semibold text-sidebar-foreground text-sm">
+                  UST
                 </h1>
-                <p className="text-xs text-muted-foreground">Management</p>
+                <p className="text-xs text-muted-foreground">Dashboard</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {collapsed && (
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md mx-auto">
-            <Briefcase className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-xl bg-transparent flex items-center justify-center shadow-md mx-auto overflow-hidden">
+            <img
+              src="/ust-logo.svg"
+              alt="UST"
+              className="w-full h-full object-cover"
+            />
           </div>
         )}
       </div>
@@ -115,10 +122,10 @@ const Sidebar: React.FC = () => {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative overflow-hidden",
+                "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-180 group relative overflow-hidden",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/40"
               )}
             >
               {/* Decorative colored strip when active (visual only) */}
@@ -129,12 +136,14 @@ const Sidebar: React.FC = () => {
                   isActive ? "bg-sidebar-primary" : ""
                 )}
               />
-              <item.icon
-                className={cn(
-                  "w-5 h-5 flex-shrink-0 transition-transform duration-200",
-                  isActive ? "text-sidebar-primary" : "group-hover:scale-110"
-                )}
-              />
+              <div className="w-9 h-9 flex items-center justify-center rounded-md bg-sidebar-accent/10">
+                <item.icon
+                  className={cn(
+                    "w-5 h-5 flex-shrink-0 transition-transform duration-150",
+                    isActive ? "text-sidebar-primary" : "group-hover:scale-110"
+                  )}
+                />
+              </div>
               <AnimatePresence mode="wait">
                 {!collapsed && (
                   <motion.span

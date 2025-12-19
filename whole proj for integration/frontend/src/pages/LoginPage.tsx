@@ -57,7 +57,13 @@ const LoginPage: React.FC = () => {
 
   const demoCredentials = [
     { id: "1", role: "Admin", icon: Shield, password: "admin123" },
-    { id: "2", role: "Manager", icon: Briefcase, password: "manager123" },
+    {
+      id: "2",
+      role: "Manager",
+      // use public SVG logo for manager demo entry (UI-only)
+      icon: (props: any) => <img src="/ust-logo.svg" alt="UST" {...props} />,
+      password: "manager123",
+    },
     { id: "4", role: "Developer", icon: Users, password: "dev123" },
   ];
 
@@ -191,9 +197,13 @@ const LoginPage: React.FC = () => {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 220 }}
-              className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-3 shadow-glow border border-border/30"
+              className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-3 shadow-glow border border-border/30 overflow-hidden"
             >
-              <Briefcase className="w-9 h-9 text-primary-foreground" />
+              <img
+                src="/ust-logo.svg"
+                alt="UST"
+                className="w-12 h-12 object-contain"
+              />
             </motion.div>
             <CardTitle className="text-2xl font-extrabold text-foreground">
               UST Employee Management

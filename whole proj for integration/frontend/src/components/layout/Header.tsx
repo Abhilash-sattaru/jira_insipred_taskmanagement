@@ -39,6 +39,7 @@ import { formatDistanceToNow } from "date-fns";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
+  const { refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const {
     notifications,
@@ -49,6 +50,19 @@ const Header: React.FC = () => {
   } = useNotifications();
   const navigate = useNavigate();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  React.useEffect(() => {
+    // If user exists but employee details are missing, try refreshing from backend
+    if (user && !user.employee) {
+      (async () => {
+        try {
+          await refreshUser();
+        } catch {
+          // ignore
+        }
+      })();
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -72,26 +86,87 @@ const Header: React.FC = () => {
 
   return (
     <header className="h-20 border-b border-border glass-card sticky top-0 z-40 flex items-center justify-between px-6">
+      {/* Left: logo + title (clickable) */}
       <div className="flex items-center gap-4">
-        <div className="flex flex-col leading-tight">
-          <h2 className="text-lg font-bold text-foreground">Welcome back,</h2>
-          <span className="text-2xl font-extrabold text-gradient -mt-1">
-            {user?.employee?.name?.split(" ")[0] || "User"}
-          </span>
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => navigate("/dashboard")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
+            <svg
+              className="w-5 h-5 text-primary-foreground"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 7h16v10H4z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 3v4"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M15 3v4"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="text-base md:text-lg font-semibold text-foreground">
+              UST Employee Management
+            </span>
+            <span className="text-xs text-muted-foreground">Dashboard</span>
+          </div>
         </div>
       </div>
 
-      {/* Centered app title (visual only, non-interactive) */}
-      <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
-        <span
-          className="text-sm font-bold text-foreground/80 bg-clip-text text-transparent"
-          style={{
-            backgroundImage:
-              "linear-gradient(90deg, rgba(23,197,174,1), rgba(56,189,248,1))",
-          }}
-        >
-          UST Employee Management
-        </span>
+      {/* Center: search (UI only) */}
+      <div className="flex-1 px-6">
+        <div className="max-w-xl mx-auto hidden md:block">
+          <div className="relative">
+            <input
+              placeholder="Search tasks, employees or reports..."
+              className="w-full h-10 pl-4 pr-10 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label="Search (UI only)"
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21 21l-4.35-4.35"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
