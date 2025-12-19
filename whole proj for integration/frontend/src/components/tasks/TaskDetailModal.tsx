@@ -4,19 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { Task, TaskStatus } from "@/types";
-import {
-  mockEmployees,
-  getEmployeesByManager,
-  mockUsers,
-  getEmployeeById,
-} from "@/data/mockData";
-import { fetchEmployees } from "@/lib/api";
+import { fetchEmployees, fetchMyEmployees, fetchUsers } from "@/lib/api";
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +56,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const [employees, setEmployees] = useState(() => mockEmployees);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [developersList, setDevelopersList] = useState<any[]>([]);
   // assignee has been removed from UI per request; keep employees list for reviewer/creator lookups
   const reviewer = employees.find((e) => empIdEquals(e.e_id, task.reviewer));
   const creator = employees.find((e) => empIdEquals(e.e_id, task.created_by));
@@ -69,36 +66,170 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   // Manager-specific lists and local state for editable fields
   const managerId =
     (user?.employee?.e_id as string) || (user?.e_id as string) || undefined;
-  const teamMembers = managerId ? getEmployeesByManager(String(managerId)) : [];
-  const managers = mockUsers
-    .filter((u) => u.roles.includes("MANAGER"))
-    .map((u) => u.employee)
+  const teamMembers = managerId
+    ? employees.filter((e) => String(e.mgr_id) === String(managerId))
+    : [];
+
+  const managers = usersList
+    .filter((u) => Array.isArray(u.roles) && u.roles.includes("MANAGER"))
+    .map((u) => {
+      const emp = employees.find((e) => String(e.e_id) === String(u.e_id));
+      return emp || { e_id: u.e_id, name: u.employee?.name || u.e_id };
+    })
     .filter(Boolean) as any[];
+
+  // ensure the logged-in manager (if any) is present in the managers list
+  if (hasRole("MANAGER") && user?.e_id) {
+    const idStr = String(user.e_id);
+    const exists = managers.some((m) => String(m.e_id) === idStr);
+    if (!exists) {
+      const empRecord = employees.find((e) => String(e.e_id) === idStr);
+      const entry =
+        empRecord ||
+        ({
+          e_id: idStr,
+          name: user.employee?.name || `Manager ${idStr}`,
+        } as any);
+      managers.unshift(entry);
+    }
+  }
+
+  // dedupe managers by e_id to be safe
+  const seenMgr = new Set<string>();
+  const dedupedManagers = managers.filter((m) => {
+    const k = String(m.e_id);
+    if (seenMgr.has(k)) return false;
+    seenMgr.add(k);
+    return true;
+  });
 
   // load employees from API for accurate names
   const { token } = useAuth();
-  React.useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!token) return;
-      try {
-        const data: any = await fetchEmployees(token || null);
-        if (!mounted) return;
-        if (Array.isArray(data)) {
-          setEmployees(data.map((e: any) => ({ ...e, e_id: String(e.e_id) })));
-        }
-      } catch (err) {
-        // ignore and keep mock
+  const isMountedRef = React.useRef(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  const loadEmployees = React.useCallback(async () => {
+    setLoadError(null);
+    if (!token) return;
+    try {
+      const [edata, udata] = await Promise.all([
+        hasRole("MANAGER") && !hasRole("ADMIN")
+          ? fetchMyEmployees(token || null)
+          : fetchEmployees(token || null),
+        // Only fetch users when running as ADMIN (users list is admin-only on backend)
+        hasRole("ADMIN")
+          ? fetchUsers(token || null).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+      if (!isMountedRef.current) return;
+      if (Array.isArray(edata)) {
+        const mappedEmps = edata.map((e: any) => ({
+          ...e,
+          e_id: String(e.e_id),
+        }));
+        setEmployees(mappedEmps);
+        // derive developers list from edata: for managers, edata is likely the manager's team
+        try {
+          let devsFromEmps = mappedEmps;
+          if (!(hasRole("MANAGER") && !hasRole("ADMIN"))) {
+            // for admins or others, try filter by designation containing 'developer' or 'dev'
+            devsFromEmps = mappedEmps.filter((emp: any) => {
+              const des = (emp.designation || "").toLowerCase();
+              return des.includes("developer") || des.includes("dev");
+            });
+          }
+          if (devsFromEmps.length > 0) {
+            setDevelopersList(
+              devsFromEmps.map((d: any) => ({ ...d, e_id: String(d.e_id) }))
+            );
+          }
+        } catch {}
       }
-    };
-    load();
+      if (Array.isArray(udata)) {
+        setUsersList(udata as any[]);
+        // derive developers list from users when available
+        const devsFromUsers = udata
+          .filter(
+            (u: any) => Array.isArray(u.roles) && u.roles.includes("DEVELOPER")
+          )
+          .map((u: any) => {
+            const emp = (Array.isArray(edata) ? edata : []).find(
+              (e: any) => String(e.e_id) === String(u.e_id)
+            );
+            return (
+              emp || {
+                e_id: String(u.e_id),
+                name: u.employee?.name || u.name || String(u.e_id),
+              }
+            );
+          });
+        if (devsFromUsers.length > 0) {
+          setDevelopersList(
+            devsFromUsers.map((d: any) => ({ ...d, e_id: String(d.e_id) }))
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("Failed to load employees/users", err);
+      // try alternative: fetch users and derive employee info (some backends expose limited user -> employee mapping)
+      try {
+        if (hasRole("ADMIN")) {
+          const udata: any = await fetchUsers(token || null).catch(() => []);
+          if (Array.isArray(udata) && udata.length > 0) {
+            const fromUsers = udata
+              .map((u: any) => ({
+                ...(u.employee || {}),
+                e_id: String(u.e_id),
+                roles: u.roles,
+              }))
+              .filter((x: any) => x && x.e_id);
+            if (fromUsers.length > 0) {
+              if (!isMountedRef.current) return;
+              setEmployees(fromUsers as any[]);
+              // also set developers from this fallback
+              const devs = udata
+                .filter(
+                  (u: any) =>
+                    Array.isArray(u.roles) && u.roles.includes("DEVELOPER")
+                )
+                .map((u: any) => ({
+                  ...(u.employee || {}),
+                  e_id: String(u.e_id),
+                  name: u.employee?.name || u.name || String(u.e_id),
+                }));
+              if (devs.length > 0) setDevelopersList(devs as any[]);
+            }
+          }
+        }
+      } catch (uerr) {
+        console.debug("TaskDetailModal: fetchUsers fallback failed", uerr);
+      }
+
+      // per-employee GET is not provided by the API (405); we already attempted /api/users fallback above
+
+      setLoadError(err?.message || String(err));
+      toast({
+        title: "Data load failed",
+        description:
+          "Failed to load employees or users from the server. Please check your login and try again.",
+        variant: "destructive",
+      });
+    }
+  }, [token, task.created_by, task.reviewer]);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    loadEmployees();
     return () => {
-      mounted = false;
+      isMountedRef.current = false;
     };
-  }, [token]);
+  }, [loadEmployees]);
 
   const [selectedReviewer, setSelectedReviewer] = useState<string | undefined>(
     task.reviewer
+  );
+  const [selectedAssignee, setSelectedAssignee] = useState<string | undefined>(
+    task.assigned_to
   );
   const [selectedDueDate, setSelectedDueDate] = useState<string | undefined>(
     task.expected_closure ? task.expected_closure.split("T")[0] : undefined
@@ -260,6 +391,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <DialogTitle className="text-xl font-bold text-foreground mt-1">
                 {task.title}
               </DialogTitle>
+              <DialogDescription>
+                {task.description
+                  ? task.description.slice(0, 140)
+                  : "Task details and actions"}
+              </DialogDescription>
             </div>
             <div className="flex items-center gap-2">
               {canDelete && (
@@ -275,6 +411,22 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           </div>
         </DialogHeader>
+        {loadError && (
+          <div className="mx-6 mt-2 p-3 rounded bg-destructive/10 text-destructive text-sm flex items-center justify-between">
+            <div className="pr-4">
+              Employee/user data blocked by server: {loadError}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => loadEmployees()}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-6 mt-4">
           {/* Status & Priority Badges */}
@@ -333,7 +485,38 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-3">
-              {/* Assigned-to UI removed */}
+              {/* Assigned-to (editable by MANAGER/ADMIN) */}
+              <div className="flex items-center gap-2 text-sm">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Assigned to:</span>
+                {hasRole("MANAGER") || hasRole("ADMIN") ? (
+                  <select
+                    value={selectedAssignee || ""}
+                    onChange={(e) => {
+                      const v = e.target.value || undefined;
+                      setSelectedAssignee(v);
+                      updateTask(task.t_id, { assigned_to: v });
+                    }}
+                    className="ml-2 text-sm p-1 border rounded"
+                  >
+                    <option value="">Unassigned</option>
+                    {developersList.map((d) => (
+                      <option key={d.e_id} value={d.e_id}>
+                        {d.name} ({d.e_id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="font-medium text-foreground">
+                    {(() => {
+                      const asg = employees.find((e) =>
+                        empIdEquals(e.e_id, task.assigned_to)
+                      );
+                      return asg?.name || task.assigned_to || "Not assigned";
+                    })()}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm">
                 <User className="w-4 h-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Reviewer:</span>
@@ -348,7 +531,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     className="ml-2 text-sm p-1 border rounded"
                   >
                     <option value="">Not assigned</option>
-                    {managers.map((m) => (
+                    {dedupedManagers.map((m) => (
                       <option key={m.e_id} value={m.e_id}>
                         {m.name} ({m.e_id})
                       </option>
@@ -365,9 +548,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <span className="text-muted-foreground">Created by:</span>
                 <span className="font-medium text-foreground">
                   {(() => {
-                    // Try to resolve creator from mock data
+                    // Resolve creator name from loaded employees
                     const cr =
-                      getEmployeeById(task.created_by as string) || creator;
+                      employees.find((e) =>
+                        empIdEquals(e.e_id, task.created_by)
+                      ) || creator;
                     return cr?.name || "Unknown";
                   })()}
                 </span>
@@ -551,12 +736,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               }
                               const { blob, filename } = await (
                                 await import("@/lib/api")
-                              ).downloadFile(
-                                remark.file_id,
-                                (
-                                  await import("@/contexts/AuthContext")
-                                ).useAuth().token
-                              );
+                              ).downloadFile(remark.file_id, token);
                               const url = window.URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = url;

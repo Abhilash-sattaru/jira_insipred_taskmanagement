@@ -7,7 +7,6 @@ import React, {
   useEffect,
 } from "react";
 import { Task, TaskStatus, Remark } from "@/types";
-import { mockTasks } from "@/data/mockData";
 import {
   fetchTasks,
   createTaskAPI,
@@ -16,7 +15,9 @@ import {
   createRemarkAPI,
   createRemarkWithFile,
   fetchEmployees,
+  fetchMyEmployees,
 } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import confetti from "canvas-confetti";
 
@@ -44,7 +45,7 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 export const TaskProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [employeesMap, setEmployeesMap] = useState<Record<string, any>>({});
   const { token, hasRole } = useAuth();
 
@@ -81,7 +82,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
         try {
           let localEmpMap: Record<string, any> = {};
           try {
-            const emps: any[] = await fetchEmployees(token);
+            const emps: any[] =
+              hasRole("MANAGER") && !hasRole("ADMIN")
+                ? await fetchMyEmployees(token)
+                : await fetchEmployees(token);
             if (Array.isArray(emps)) {
               emps.forEach((e: any) => {
                 localEmpMap[String(e.e_id)] = e;
@@ -127,7 +131,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
           if (mounted) setTasks(mapped);
         }
       } catch (err) {
-        console.warn("Failed to load tasks from API, using mock data", err);
+        console.warn("Failed to load tasks from API", err);
       }
     };
     load();
@@ -138,7 +142,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
 
   const addTask = useCallback(
     async (task: Omit<Task, "t_id" | "remarks">) => {
-      // Try create via API, fallback to local mock
+      // Try create via API, fallback to local in-memory list
       const normalizeId = (val: any): number | null => {
         if (val == null) return null;
         if (typeof val === "number") return val;
@@ -152,60 +156,63 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
       // Only attempt to create via API if user has permissions
       const canCreateRemote =
         token && (hasRole?.("ADMIN") || hasRole?.("MANAGER"));
-      if (canCreateRemote) {
-        try {
-          const payload = {
-            title: task.title,
-            description: task.description,
-            priority: task.priority,
-            // ensure expected_closure is an ISO datetime string
-            expected_closure: task.expected_closure
-              ? new Date(task.expected_closure).toISOString()
-              : null,
-            assigned_to: normalizeId(task.assigned_to),
-            reviewer: normalizeId(task.reviewer),
-          };
-          const created = await createTaskAPI(payload, token);
-          const newTask: Task = {
-            t_id: String(created.t_id),
-            title: created.title,
-            description: created.description,
-            created_by: String(created.created_by),
-            assigned_to:
-              created.assigned_to != null
-                ? String(created.assigned_to)
-                : undefined,
-            assigned_by: undefined,
-            assigned_at: undefined,
-            updated_by: undefined,
-            updated_at: created.updated_at
-              ? new Date(created.updated_at).toISOString()
-              : undefined,
-            priority: created.priority,
-            status: created.status,
-            reviewer:
-              created.reviewer != null ? String(created.reviewer) : undefined,
-            expected_closure: created.expected_closure,
-            actual_closure: created.actual_closure,
-            remarks: [],
-          };
-          setTasks((prev) => [...prev, newTask]);
-          return;
-        } catch (err) {
-          console.warn(
-            "Create task via API failed, falling back to local",
-            err
-          );
-        }
+      if (!canCreateRemote) {
+        toast({
+          title: "Not authorized",
+          description:
+            "You don't have permission to create tasks on the server.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // local fallback
-      const newTask: Task = {
-        ...task,
-        t_id: `TASK${String(tasks.length + 1).padStart(3, "0")}`,
-        remarks: [],
-      };
-      setTasks((prev) => [...prev, newTask]);
+      try {
+        const payload = {
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          // ensure expected_closure is an ISO datetime string
+          expected_closure: task.expected_closure
+            ? new Date(task.expected_closure).toISOString()
+            : null,
+          assigned_to: normalizeId(task.assigned_to),
+          reviewer: normalizeId(task.reviewer),
+        };
+        const created = await createTaskAPI(payload, token);
+        const newTask: Task = {
+          t_id: String(created.t_id),
+          title: created.title,
+          description: created.description,
+          created_by: String(created.created_by),
+          assigned_to:
+            created.assigned_to != null
+              ? String(created.assigned_to)
+              : undefined,
+          assigned_by: undefined,
+          assigned_at: undefined,
+          updated_by: undefined,
+          updated_at: created.updated_at
+            ? new Date(created.updated_at).toISOString()
+            : undefined,
+          priority: created.priority,
+          status: created.status,
+          reviewer:
+            created.reviewer != null ? String(created.reviewer) : undefined,
+          expected_closure: created.expected_closure,
+          actual_closure: created.actual_closure,
+          remarks: [],
+        };
+        setTasks((prev) => [...prev, newTask]);
+        return;
+      } catch (err: any) {
+        console.error("Create task via API failed", err);
+        toast({
+          title: "Create failed",
+          description: err?.message || "Failed to create task on the server.",
+          variant: "destructive",
+        });
+        return;
+      }
     },
     [tasks.length, token]
   );
@@ -235,21 +242,40 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
         payload.expected_closure = v ? new Date(v).toISOString() : null;
       }
 
-      if (token) {
-        try {
-          // Try to patch via API (taskId may be a string like 'TASK001' or a numeric id)
-          await patchTaskAPI(taskId, payload, token);
-        } catch (err) {
-          console.warn("Patch task API failed", err);
-        }
+      if (!token) {
+        toast({
+          title: "Not authenticated",
+          description: "You must be logged in to update tasks.",
+          variant: "destructive",
+        });
+        return;
       }
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.t_id === taskId
-            ? { ...t, ...updates, updated_at: new Date().toISOString() }
-            : t
-        )
-      );
+
+      try {
+        const updatedResp = await patchTaskAPI(taskId, payload, token);
+        // Update local cache based on successful response (best-effort)
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.t_id === taskId
+              ? {
+                  ...t,
+                  ...updates,
+                  updated_at: updatedResp?.updated_at
+                    ? new Date(updatedResp.updated_at).toISOString()
+                    : new Date().toISOString(),
+                }
+              : t
+          )
+        );
+      } catch (err: any) {
+        console.error("Patch task API failed", err);
+        toast({
+          title: "Update failed",
+          description: err?.message || "Failed to update task on server.",
+          variant: "destructive",
+        });
+        return;
+      }
     },
     [token]
   );
@@ -266,54 +292,68 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
       updatedBy: string,
       remark?: string
     ) => {
-      // Patch status via API if possible
-      if (token) {
-        try {
-          await patchTaskAPI(taskId, { status }, token);
-        } catch (err) {
-          console.warn("Failed to update task status via API", err);
-        }
+      if (!token) {
+        toast({
+          title: "Not authenticated",
+          description: "You must be logged in to change task status.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.t_id !== taskId) return t;
+      try {
+        const updatedResp = await patchTaskAPI(taskId, { status }, token);
 
-          const updates: Partial<Task> = {
-            status,
-            updated_by: updatedBy,
-            updated_at: new Date().toISOString(),
-          };
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.t_id !== taskId) return t;
 
-          if (status === "DONE") {
-            updates.actual_closure = new Date().toISOString();
-            // Trigger confetti celebration
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 },
-              colors: ["#22c55e", "#3b82f6", "#8b5cf6", "#f59e0b"],
-            });
-          }
+            const updates: Partial<Task> = {
+              status,
+              updated_by: updatedBy,
+              updated_at: updatedResp?.updated_at
+                ? new Date(updatedResp.updated_at).toISOString()
+                : new Date().toISOString(),
+            };
 
-          let newRemarks = t.remarks || [];
-          if (remark) {
-            newRemarks = [
-              ...newRemarks,
-              {
-                id: `REM${Date.now()}`,
-                task_id: taskId,
-                user_id: updatedBy,
-                user_name: updatedBy,
-                content: remark,
-                created_at: new Date().toISOString(),
-              },
-            ];
-          }
+            if (status === "DONE") {
+              updates.actual_closure = new Date().toISOString();
+              // Trigger confetti celebration
+              confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ["#22c55e", "#3b82f6", "#8b5cf6", "#f59e0b"],
+              });
+            }
 
-          return { ...t, ...updates, remarks: newRemarks };
-        })
-      );
+            let newRemarks = t.remarks || [];
+            if (remark) {
+              newRemarks = [
+                ...newRemarks,
+                {
+                  id: `REM${Date.now()}`,
+                  task_id: taskId,
+                  user_id: updatedBy,
+                  user_name: updatedBy,
+                  content: remark,
+                  created_at: new Date().toISOString(),
+                },
+              ];
+            }
+
+            return { ...t, ...updates, remarks: newRemarks };
+          })
+        );
+      } catch (err: any) {
+        console.error("Failed to update task status via API", err);
+        toast({
+          title: "Status update failed",
+          description: err?.message || "Failed to update status on server.",
+          variant: "destructive",
+        });
+        return;
+      }
     },
     [token]
   );
@@ -325,71 +365,64 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({
         attachmentFile?: File | null;
       }
     ) => {
-      // Persist remark to backend when possible
-      if (token) {
-        try {
-          // attempt to post remark via API
-          // extract numeric id
-          const m = String(taskId).match(/(\d+)/);
-          const numericId = m ? Number(m[0]) : taskId;
-          // If we have an attachment file, use multipart endpoint
-          let created: any;
-          if (remark.attachmentFile) {
-            created = await createRemarkWithFile(
-              numericId,
-              remark.content,
-              remark.attachmentFile,
-              token
-            );
-          } else {
-            created = await createRemarkAPI(numericId, remark.content, token);
-          }
-          // expect backend returns created remark object
-          const createdRemark: Remark = {
-            id: created._id || created.id || `REM${Date.now()}`,
-            task_id: String(created.task_id || taskId),
-            user_id: String(
-              created.e_id ?? created.user_id ?? remark.user_id ?? ""
-            ),
-            user_name:
-              (employeesMap[String(created.e_id)] &&
-                employeesMap[String(created.e_id)].name) ||
-              created.user_name ||
-              remark.user_name ||
-              "Unknown",
-            content: created.comment || created.content || remark.content,
-            created_at: created.created_at || new Date().toISOString(),
-            attachment: created.file_name || created.attachment,
-            file_id: created.file_id || null,
-          };
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.t_id !== taskId
-                ? t
-                : { ...t, remarks: [...(t.remarks || []), createdRemark] }
-            )
-          );
-          return;
-        } catch (err) {
-          console.warn(
-            "Failed to persist remark to API, falling back to local",
-            err
-          );
-        }
+      if (!token) {
+        toast({
+          title: "Not authenticated",
+          description: "You must be logged in to add remarks.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // local fallback if API not available or failed
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.t_id !== taskId) return t;
-          const newRemark: Remark = {
-            ...remark,
-            id: `REM${Date.now()}`,
-            created_at: new Date().toISOString(),
-          };
-          return { ...t, remarks: [...(t.remarks || []), newRemark] };
-        })
-      );
+      try {
+        const m = String(taskId).match(/(\d+)/);
+        const numericId = m ? Number(m[0]) : taskId;
+        let created: any;
+        if (remark.attachmentFile) {
+          created = await createRemarkWithFile(
+            numericId,
+            remark.content,
+            remark.attachmentFile,
+            token
+          );
+        } else {
+          created = await createRemarkAPI(numericId, remark.content, token);
+        }
+
+        const createdRemark: Remark = {
+          id: created._id || created.id || `REM${Date.now()}`,
+          task_id: String(created.task_id || taskId),
+          user_id: String(
+            created.e_id ?? created.user_id ?? remark.user_id ?? ""
+          ),
+          user_name:
+            (employeesMap[String(created.e_id)] &&
+              employeesMap[String(created.e_id)].name) ||
+            created.user_name ||
+            remark.user_name ||
+            "Unknown",
+          content: created.comment || created.content || remark.content,
+          created_at: created.created_at || new Date().toISOString(),
+          attachment: created.file_name || created.attachment,
+          file_id: created.file_id || null,
+        };
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.t_id !== taskId
+              ? t
+              : { ...t, remarks: [...(t.remarks || []), createdRemark] }
+          )
+        );
+        return;
+      } catch (err: any) {
+        console.error("Failed to persist remark to API", err);
+        toast({
+          title: "Add comment failed",
+          description: err?.message || "Failed to add comment on server.",
+          variant: "destructive",
+        });
+        return;
+      }
     },
     [token, employeesMap]
   );

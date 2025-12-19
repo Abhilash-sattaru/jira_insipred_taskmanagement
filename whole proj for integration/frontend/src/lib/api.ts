@@ -211,6 +211,25 @@ export async function fetchEmployees(token?: string | null) {
   return res.json();
 }
 
+export async function fetchEmployee(
+  e_id: number | string,
+  token?: string | null
+) {
+  const res = await fetch(`${BASE_URL}/api/employees/${e_id}/`, {
+    headers: {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    const txt = await res
+      .text()
+      .catch(() => res.statusText || `HTTP ${res.status}`);
+    throw new Error(txt || "Failed to fetch employee");
+  }
+  return res.json();
+}
+
 export async function fetchMyEmployees(token?: string | null) {
   const res = await fetch(`${BASE_URL}/api/employees/me/`, {
     headers: {

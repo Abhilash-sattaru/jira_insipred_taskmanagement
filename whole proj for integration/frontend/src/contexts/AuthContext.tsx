@@ -6,13 +6,18 @@ import React, {
   ReactNode,
 } from "react";
 import { User, AuthState, Role } from "@/types";
-import { mockUsers } from "@/data/mockData";
-import { loginRequest } from "@/lib/api";
+import {
+  loginRequest,
+  fetchEmployees,
+  fetchMyEmployees,
+  fetchEmployee,
+} from "@/lib/api";
 
 interface AuthContextType extends AuthState {
   login: (employeeId: string, password: string) => Promise<boolean>;
   logout: () => void;
   hasRole: (role: Role) => boolean;
+  refreshUser: () => Promise<void>;
   updateUserAvatar: (avatar: string) => void;
 }
 
@@ -81,21 +86,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         } as User;
       }
 
-      // Attempt to enrich user with employee details from mock data when available
+      // Attempt to enrich user with their own employee details from backend when available
       if (user) {
-        // Normalize to mock employee id format if numeric (e.g. 1 -> EMP001)
-        let lookupId = String(user.e_id);
-        if (/^[0-9]+$/.test(lookupId)) {
-          lookupId = `EMP${String(Number(lookupId)).padStart(3, "0")}`;
-        }
-
-        // Try to find matching mock employee
-        const { mockEmployees } = await import("@/data/mockData");
-        const emp = mockEmployees.find(
-          (e) => e.e_id === lookupId || e.e_id === user.e_id
-        );
-        if (emp) {
-          user.employee = emp as any;
+        try {
+          // Prefer numeric id from token (or fallback to provided employeeId).
+          // Accept formats like 1 or "EMP001" — try to extract numeric portion.
+          const rawId = String(user.e_id ?? employeeId);
+          let numericId = Number(rawId);
+          if (Number.isNaN(numericId)) {
+            const m = rawId.match(/(\d+)/);
+            numericId = m ? Number(m[0]) : NaN;
+          }
+          if (!Number.isNaN(numericId)) {
+            const emp = await fetchEmployee(numericId, token);
+            if (emp) user.employee = { ...emp, e_id: String(emp.e_id) } as any;
+          }
+        } catch {
+          // ignore enrichment failure - best-effort
         }
       }
 
@@ -123,6 +130,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     });
   };
 
+  const refreshUser = async () => {
+    const token = authState.token;
+    const user = authState.user;
+    if (!token || !user) return;
+    try {
+      const rawId = String(user.e_id);
+      let numericId = Number(rawId);
+      if (Number.isNaN(numericId)) {
+        const m = rawId.match(/(\d+)/);
+        numericId = m ? Number(m[0]) : NaN;
+      }
+      if (!Number.isNaN(numericId)) {
+        const emp = await fetchEmployee(numericId, token);
+        if (emp) {
+          const updatedUser = {
+            ...user,
+            employee: { ...emp, e_id: String(emp.e_id) },
+          } as User;
+          localStorage.setItem("auth_user", JSON.stringify(updatedUser));
+          setAuthState((prev) => ({ ...prev, user: updatedUser }));
+        }
+      }
+    } catch (e) {
+      // ignore enrichment failure
+    }
+  };
+
   const hasRole = (role: Role): boolean => {
     return authState.user?.roles.includes(role) ?? false;
   };
@@ -142,7 +176,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ ...authState, login, logout, hasRole, updateUserAvatar }}
+      value={{
+        ...authState,
+        login,
+        logout,
+        hasRole,
+        refreshUser,
+        updateUserAvatar,
+      }}
     >
       {children}
     </AuthContext.Provider>

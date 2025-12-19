@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { empIdEquals } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
-import { mockEmployees } from "@/data/mockData";
+import { fetchEmployees, fetchMyEmployees } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ListTodo,
@@ -30,8 +30,36 @@ import {
 } from "recharts";
 
 const DashboardHome: React.FC = () => {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, token } = useAuth();
   const { tasks } = useTasks();
+  const [employees, setEmployees] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!token) return;
+      try {
+        let data: any = [];
+        if (hasRole("MANAGER")) {
+          data = await fetchMyEmployees(token || null);
+        } else if (hasRole("ADMIN")) {
+          data = await fetchEmployees(token || null);
+        } else {
+          data = [];
+        }
+        if (!mounted) return;
+        if (Array.isArray(data)) {
+          setEmployees(data.map((e: any) => ({ ...e, e_id: String(e.e_id) })));
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [token, hasRole]);
 
   // Calculate stats
   const todoCount = tasks.filter((t) => t.status === "TO_DO").length;
@@ -381,7 +409,7 @@ const DashboardHome: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockEmployees.slice(0, 5).map((employee, index) => (
+                {employees.slice(0, 5).map((employee, index) => (
                   <motion.div
                     key={employee.e_id}
                     initial={{ opacity: 0, x: 10 }}

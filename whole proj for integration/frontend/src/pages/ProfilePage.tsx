@@ -1,13 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import React, { useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   User,
   Mail,
@@ -17,25 +17,27 @@ import {
   Shield,
   Code,
   Loader2,
-} from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const ProfilePage: React.FC = () => {
   const { user, updateUserAvatar } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
-        title: 'Invalid File',
-        description: 'Please upload an image file',
-        variant: 'destructive',
+        title: "Invalid File",
+        description: "Please upload an image file",
+        variant: "destructive",
       });
       return;
     }
@@ -43,9 +45,9 @@ const ProfilePage: React.FC = () => {
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: 'File Too Large',
-        description: 'Please upload an image smaller than 5MB',
-        variant: 'destructive',
+        title: "File Too Large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
       });
       return;
     }
@@ -59,17 +61,17 @@ const ProfilePage: React.FC = () => {
         const base64 = e.target?.result as string;
         updateUserAvatar(base64);
         toast({
-          title: 'Profile Updated',
-          description: 'Your profile picture has been updated',
+          title: "Profile Updated",
+          description: "Your profile picture has been updated",
         });
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
     } catch {
       toast({
-        title: 'Error',
-        description: 'Failed to upload image',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
       });
       setIsUploading(false);
     }
@@ -77,10 +79,10 @@ const ProfilePage: React.FC = () => {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'ADMIN':
+      case "ADMIN":
         return <Shield className="w-4 h-4" />;
-      case 'MANAGER':
-        return <Briefcase className="w-4 h-4" />;
+      case "MANAGER":
+        return <img src="/ust-logo.svg" alt="UST" className="w-4 h-4" />;
       default:
         return <Code className="w-4 h-4" />;
     }
@@ -88,12 +90,12 @@ const ProfilePage: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'ADMIN':
-        return 'bg-destructive/10 text-destructive';
-      case 'MANAGER':
-        return 'bg-warning/10 text-warning';
+      case "ADMIN":
+        return "bg-destructive/10 text-destructive";
+      case "MANAGER":
+        return "bg-warning/10 text-warning";
       default:
-        return 'bg-info/10 text-info';
+        return "bg-info/10 text-info";
     }
   };
 
@@ -119,7 +121,7 @@ const ProfilePage: React.FC = () => {
                 <Avatar className="w-32 h-32">
                   <AvatarImage src={user?.employee?.avatar} />
                   <AvatarFallback className="text-3xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
-                    {user?.employee?.name?.charAt(0) || 'U'}
+                    {user?.employee?.name?.charAt(0) || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <button
@@ -143,13 +145,15 @@ const ProfilePage: React.FC = () => {
               </div>
 
               <h2 className="mt-4 text-xl font-bold text-foreground">
-                {user?.employee?.name || 'Unknown User'}
+                {user?.employee?.name || "Unknown User"}
               </h2>
-              <p className="text-muted-foreground">{user?.employee?.designation}</p>
+              <p className="text-muted-foreground">
+                {user?.employee?.designation}
+              </p>
 
               <div className="flex flex-wrap gap-2 mt-4 justify-center">
-                {user?.roles.map(role => (
-                  <Badge key={role} className={cn('gap-1', getRoleColor(role))}>
+                {user?.roles.map((role) => (
+                  <Badge key={role} className={cn("gap-1", getRoleColor(role))}>
                     {getRoleIcon(role)}
                     {role}
                   </Badge>
@@ -161,14 +165,18 @@ const ProfilePage: React.FC = () => {
               <div className="w-full space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <Mail className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{user?.employee?.email}</span>
+                  <span className="text-muted-foreground">
+                    {user?.employee?.email}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Building2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{user?.employee?.department || 'N/A'}</span>
+                  <span className="text-muted-foreground">
+                    {user?.employee?.department || "N/A"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Briefcase className="w-4 h-4 text-muted-foreground" />
+                  <img src="/ust-logo.svg" alt="UST" className="w-4 h-4" />
                   <span className="text-muted-foreground">{user?.e_id}</span>
                 </div>
               </div>
@@ -192,7 +200,7 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Full Name</Label>
                   <Input
-                    value={user?.employee?.name || ''}
+                    value={user?.employee?.name || ""}
                     disabled
                     className="bg-secondary/50"
                   />
@@ -200,7 +208,7 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Employee ID</Label>
                   <Input
-                    value={user?.e_id || ''}
+                    value={user?.e_id || ""}
                     disabled
                     className="bg-secondary/50"
                   />
@@ -211,7 +219,7 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Input
-                    value={user?.employee?.email || ''}
+                    value={user?.employee?.email || ""}
                     disabled
                     className="bg-secondary/50"
                   />
@@ -219,7 +227,7 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Designation</Label>
                   <Input
-                    value={user?.employee?.designation || ''}
+                    value={user?.employee?.designation || ""}
                     disabled
                     className="bg-secondary/50"
                   />
@@ -230,7 +238,7 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Department</Label>
                   <Input
-                    value={user?.employee?.department || 'N/A'}
+                    value={user?.employee?.department || "N/A"}
                     disabled
                     className="bg-secondary/50"
                   />
@@ -239,7 +247,9 @@ const ProfilePage: React.FC = () => {
                   <Label>Status</Label>
                   <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-secondary/50">
                     <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                    <span className="text-sm text-foreground">{user?.status || 'ACTIVE'}</span>
+                    <span className="text-sm text-foreground">
+                      {user?.status || "ACTIVE"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -249,11 +259,11 @@ const ProfilePage: React.FC = () => {
               <div className="space-y-2">
                 <Label>Assigned Roles</Label>
                 <div className="flex flex-wrap gap-2">
-                  {user?.roles.map(role => (
+                  {user?.roles.map((role) => (
                     <div
                       key={role}
                       className={cn(
-                        'flex items-center gap-2 px-3 py-2 rounded-lg',
+                        "flex items-center gap-2 px-3 py-2 rounded-lg",
                         getRoleColor(role)
                       )}
                     >
@@ -265,7 +275,8 @@ const ProfilePage: React.FC = () => {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Note: To update your profile information, please contact your administrator.
+                Note: To update your profile information, please contact your
+                administrator.
               </p>
             </CardContent>
           </Card>

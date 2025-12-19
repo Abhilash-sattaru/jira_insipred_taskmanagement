@@ -3,15 +3,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchEmployees, fetchMyEmployees } from "@/lib/api";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { mockEmployees } from "@/data/mockData";
+// removed mockEmployees import — use backend API only
 import { Priority } from "@/types";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+<DialogDescription>
+  Create a new task and assign to team members or reviewers.
+</DialogDescription>;
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,30 +52,16 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     expected_closure: "",
   });
 
-  const [employees, setEmployees] = useState(() => mockEmployees);
-  const [reviewers, setReviewers] = useState(() =>
-    mockEmployees.filter((e) =>
-      (e.designation || "").toLowerCase().includes("manager")
-    )
-  );
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [reviewers, setReviewers] = useState<any[]>([]);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       if (!token) {
-        if (hasRole("MANAGER") && user?.e_id) {
-          setEmployees(
-            mockEmployees.filter((e) => String(e.mgr_id) === String(user.e_id))
-          );
-        } else {
-          setEmployees(mockEmployees);
-        }
-        // reviewers from mock
-        setReviewers(
-          mockEmployees.filter((e) =>
-            (e.designation || "").toLowerCase().includes("manager")
-          )
-        );
+        // No auth token: cannot load employees from backend. Leave lists empty.
+        setEmployees([]);
+        setReviewers([]);
         return;
       }
 
@@ -80,8 +70,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         let data: any[] = [];
         if (hasRole("MANAGER")) {
           data = await fetchMyEmployees(token || null);
-        } else {
+        } else if (hasRole("ADMIN")) {
           data = await fetchEmployees(token || null);
+        } else {
+          // not manager or admin: do not call admin-only endpoint
+          data = [];
         }
 
         if (!mounted) return;
@@ -114,26 +107,55 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           });
           setEmployees(filtered);
         } else {
-          setEmployees(mapped.length ? mapped : mockEmployees);
+          setEmployees(mapped);
         }
 
-        // build reviewers: try to fetch full list to get all managers
+        // build reviewers: try to fetch full list to get all managers (admin only)
         try {
-          const full: any = await fetchEmployees(token || null);
-          if (Array.isArray(full)) {
-            const fullMapped = full.map((e: any) => ({
-              ...e,
-              e_id: String(e.e_id),
-              mgr_id: e.mgr_id != null ? String(e.mgr_id) : undefined,
-            }));
-            let mgrs = fullMapped.filter(
+          if (hasRole("ADMIN")) {
+            const full: any = await fetchEmployees(token || null);
+            if (Array.isArray(full)) {
+              const fullMapped = full.map((e: any) => ({
+                ...e,
+                e_id: String(e.e_id),
+                mgr_id: e.mgr_id != null ? String(e.mgr_id) : undefined,
+              }));
+              let mgrs = fullMapped.filter(
+                (emp: any) =>
+                  (emp.designation || "").toLowerCase().includes("manager") ||
+                  (emp.designation || "").toLowerCase().includes("lead")
+              );
+              if (hasRole("MANAGER") && user?.e_id) {
+                const existing = new Set(mgrs.map((m: any) => String(m.e_id)));
+                if (!existing.has(String(user.e_id))) {
+                  mgrs.unshift({
+                    e_id: String(user.e_id),
+                    name: user.employee?.name || `Manager ${user.e_id}`,
+                    designation: user.employee?.designation || "Manager",
+                  });
+                }
+              }
+              const seen = new Set<string>();
+              const deduped = mgrs.filter((m: any) => {
+                if (seen.has(String(m.e_id))) return false;
+                seen.add(String(m.e_id));
+                return true;
+              });
+              setReviewers(deduped);
+            }
+          } else {
+            // Non-admins should not call the admin endpoint. Derive reviewers from the
+            // already-fetched mapped list (if any) to avoid 403 responses.
+            const mgrs = mapped.filter(
               (emp: any) =>
                 (emp.designation || "").toLowerCase().includes("manager") ||
                 (emp.designation || "").toLowerCase().includes("lead")
             );
             if (hasRole("MANAGER") && user?.e_id) {
-              const existing = new Set(mgrs.map((m: any) => String(m.e_id)));
-              if (!existing.has(String(user.e_id))) {
+              const exists = mgrs.some(
+                (m: any) => String(m.e_id) === String(user.e_id)
+              );
+              if (!exists) {
                 mgrs.unshift({
                   e_id: String(user.e_id),
                   name: user.employee?.name || `Manager ${user.e_id}`,
@@ -150,8 +172,53 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             setReviewers(deduped);
           }
         } catch (err) {
+          // fallback: try to use /api/users to derive manager list if /api/employees is forbidden
+          if (hasRole("ADMIN")) {
+            try {
+              const udata: any = await (
+                await import("@/lib/api")
+              ).fetchUsers(token || null);
+              if (Array.isArray(udata)) {
+                const mgrsFromUsers = udata
+                  .filter(
+                    (u: any) =>
+                      Array.isArray(u.roles) && u.roles.includes("MANAGER")
+                  )
+                  .map((u: any) => ({
+                    e_id: String(u.e_id),
+                    name: u.employee?.name || u.name || `Manager ${u.e_id}`,
+                    designation: u.employee?.designation || "Manager",
+                  }));
+                if (hasRole("MANAGER") && user?.e_id) {
+                  const existing = new Set(
+                    mgrsFromUsers.map((m: any) => String(m.e_id))
+                  );
+                  if (!existing.has(String(user.e_id))) {
+                    mgrsFromUsers.unshift({
+                      e_id: String(user.e_id),
+                      name: user.employee?.name || `Manager ${user.e_id}`,
+                      designation: user.employee?.designation || "Manager",
+                    });
+                  }
+                }
+                const seen = new Set<string>();
+                const deduped = mgrsFromUsers.filter((m: any) => {
+                  if (seen.has(String(m.e_id))) return false;
+                  seen.add(String(m.e_id));
+                  return true;
+                });
+                setReviewers(deduped);
+                return;
+              }
+            } catch (uerr) {
+              console.debug(
+                "CreateTaskModal: fetchUsers fallback failed",
+                uerr
+              );
+            }
+          }
           // fallback derive from mapped
-          const mgrs = (mapped.length ? mapped : mockEmployees).filter(
+          const mgrs = mapped.filter(
             (emp: any) =>
               (emp.designation || "").toLowerCase().includes("manager") ||
               (emp.designation || "").toLowerCase().includes("lead")
@@ -177,24 +244,21 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           setReviewers(deduped);
         }
       } catch (err) {
-        console.warn(
-          "Failed to load employees for task assignment, using mock",
-          err
+        console.error(
+          "CreateTaskModal: Failed to load employees for task assignment",
+          err,
+          { token, user }
         );
         if (!mounted) return;
-        // fallback behavior
-        if (hasRole("MANAGER") && user?.e_id) {
-          setEmployees(
-            mockEmployees.filter((e) => String(e.mgr_id) === String(user.e_id))
-          );
-        } else {
-          setEmployees(mockEmployees);
-        }
-        setReviewers(
-          mockEmployees.filter((e) =>
-            (e.designation || "").toLowerCase().includes("manager")
-          )
-        );
+        // show explicit toast so user knows why dropdowns may be empty
+        toast({
+          title: "Failed to load employees",
+          description:
+            "Could not load employee list from server. Please ensure you are logged in with sufficient permissions.",
+          variant: "destructive",
+        });
+        setEmployees([]);
+        setReviewers([]);
       }
     };
     load();

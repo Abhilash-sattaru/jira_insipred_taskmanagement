@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { Task, TaskStatus } from "@/types";
-import TaskCard from "@/components/tasks/TaskCard";
+import TaskCard from "@/components/tasks/TaskCardSafe";
 import CreateTaskModal from "@/components/tasks/CreateTaskModal";
 import TaskDetailModal from "@/components/tasks/TaskDetailModal";
 import { Button } from "@/components/ui/button";

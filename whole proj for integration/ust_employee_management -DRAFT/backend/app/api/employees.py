@@ -9,6 +9,7 @@ from app.schemas.employee_schema import (
 from app.services.employee_service import (
     create_employee,
     get_all_employees,
+    get_employee,
     get_employees_by_manager,
     update_employee,
     delete_employee,
@@ -220,3 +221,44 @@ def delete(
     delete_employee(db, e_id)
     log_action("DELETE_EMPLOYEE", "EMPLOYEE", e_id, user["e_id"])
     return success_response("Employee deleted")
+
+
+# GET – any authenticated user (self) / admin / manager (only for their team)
+@router.get(
+    "/{e_id}",
+    response_model=EmployeeResponse,
+    summary="Get Employee by ID",
+    description="""
+    Retrieve a single employee record by employee ID.
+
+    **Permissions:**
+    - Admins: may retrieve any employee
+    - Managers: may retrieve employees who report to them
+    - Any authenticated user: may retrieve their own record
+    """
+)
+def get_one(
+    e_id: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_role([Role.ADMIN, Role.MANAGER, Role.DEVELOPER]))
+):
+    # user contains e_id and role
+    # Admins can access any employee
+    if user.get("role") == Role.ADMIN.value:
+        log_action("GET_EMPLOYEE", "EMPLOYEE", e_id, user["e_id"])
+        return get_employee(db, e_id)
+
+    # Users can access their own profile
+    if user.get("e_id") == e_id:
+        log_action("GET_EMPLOYEE_SELF", "EMPLOYEE", e_id, user["e_id"])
+        return get_employee(db, e_id)
+
+    # Managers may access employees who report to them
+    if user.get("role") == Role.MANAGER.value:
+        team = get_employees_by_manager(db, user["e_id"])
+        if any(e.e_id == e_id for e in team):
+            log_action("GET_EMPLOYEE_UNDER_MANAGER", "EMPLOYEE", e_id, user["e_id"])
+            return get_employee(db, e_id)
+
+    # Otherwise forbidden
+    raise HTTPException(status_code=403, detail="Access denied")

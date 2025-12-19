@@ -1,7 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { useTasks } from "@/contexts/TaskContext";
-import { mockEmployees } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchEmployees, fetchMyEmployees } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
@@ -32,6 +33,34 @@ import { empIdEquals } from "@/lib/utils";
 
 const AnalyticsPage: React.FC = () => {
   const { tasks } = useTasks();
+  const [employees, setEmployees] = React.useState<any[]>([]);
+  const { token, hasRole } = useAuth();
+
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        let data: any = [];
+        if (hasRole && hasRole("MANAGER")) {
+          data = await fetchMyEmployees(token || null);
+        } else if (hasRole && hasRole("ADMIN")) {
+          data = await fetchEmployees(token || null);
+        } else {
+          data = [];
+        }
+        if (!mounted) return;
+        if (Array.isArray(data)) {
+          setEmployees(data.map((e: any) => ({ ...e, e_id: String(e.e_id) })));
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Task stats by status
   const statusData = [
@@ -77,8 +106,8 @@ const AnalyticsPage: React.FC = () => {
   ];
 
   // Tasks per employee
-  const employeeData = mockEmployees.slice(0, 6).map((emp) => ({
-    name: emp.name.split(" ")[0],
+  const employeeData = employees.slice(0, 6).map((emp) => ({
+    name: (emp.name || "").split(" ")[0] || emp.e_id,
     tasks: tasks.filter((t) => empIdEquals(t.assigned_to, emp.e_id)).length,
     completed: tasks.filter(
       (t) => empIdEquals(t.assigned_to, emp.e_id) && t.status === "DONE"
@@ -134,7 +163,7 @@ const AnalyticsPage: React.FC = () => {
     },
     {
       title: "Team Members",
-      value: mockEmployees.length,
+      value: employees.length,
       icon: Users,
       color: "text-info",
     },

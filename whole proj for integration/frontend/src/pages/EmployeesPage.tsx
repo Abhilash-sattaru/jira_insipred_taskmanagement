@@ -2,14 +2,11 @@ import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { Employee } from "@/types";
-import {
-  mockEmployees,
-  mockUsers,
-  getEmployeesByManager,
-} from "@/data/mockData";
+// mock data removed; use backend API only
 import {
   fetchEmployees,
   fetchMyEmployees,
+  fetchUsers,
   createEmployee,
   updateEmployee,
   deleteEmployee,
@@ -69,10 +66,10 @@ const EmployeesPage: React.FC = () => {
 
   const itemsPerPage = 8;
 
-  // employees loaded from API (fallback to mock data if API fails)
+  // employees loaded from API
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = React.useState(false);
-  const [usingMockEmployees, setUsingMockEmployees] = React.useState(false);
+  const [usersList, setUsersList] = React.useState<any[]>([]);
 
   const mountedRef = useRef(true);
 
@@ -88,7 +85,6 @@ const EmployeesPage: React.FC = () => {
 
       // Normalize backend records to frontend `Employee` shape (strings for e_id/mgr_id)
       if (mountedRef.current && Array.isArray(data)) {
-        setUsingMockEmployees(false);
         const normalized = data.map((e: any) => ({
           e_id:
             e.e_id != null ? String(e.e_id) : e.id != null ? String(e.id) : "",
@@ -105,25 +101,34 @@ const EmployeesPage: React.FC = () => {
           department: e.department || e.dept || "",
         })) as Employee[];
         setEmployees(normalized);
+        // if admin, fetch users to compute active user stats
+        if (hasRole("ADMIN")) {
+          try {
+            const udata: any = await fetchUsers(token || null);
+            if (Array.isArray(udata)) {
+              setUsersList(
+                udata.map((u: any) => ({
+                  ...u,
+                  e_id: String(u.e_id),
+                  status: u.status || "INACTIVE",
+                }))
+              );
+            }
+          } catch (e) {
+            // ignore users fetch failures
+          }
+        }
       }
     } catch (err) {
-      // fallback to mock data if API unavailable or fails
-      console.error(
-        "Failed to fetch employees from API, using mock data:",
-        err
-      );
+      // API failed — show error and keep list empty
+      console.error("Failed to fetch employees from API:", err);
       toast({
         title: "Error fetching employees",
         description: (err as any)?.message || String(err),
         variant: "destructive",
       });
       if (mountedRef.current) {
-        setUsingMockEmployees(true);
-        setEmployees(
-          hasRole("ADMIN")
-            ? mockEmployees
-            : getEmployeesByManager(user?.e_id || "")
-        );
+        setEmployees([]);
       }
     } finally {
       if (mountedRef.current) setLoadingEmployees(false);
@@ -243,12 +248,10 @@ const EmployeesPage: React.FC = () => {
   };
 
   // Determine managers more flexibly: any designation containing "manager" or "lead"
-  const managers = (employees.length ? employees : mockEmployees).filter(
-    (e) => {
-      const d = (e.designation || "").toLowerCase();
-      return /manager|lead/.test(d);
-    }
-  );
+  const managers = employees.filter((e) => {
+    const d = (e.designation || "").toLowerCase();
+    return /manager|lead/.test(d);
+  });
 
   const EmployeeForm = ({
     isEdit,
@@ -432,42 +435,34 @@ const EmployeesPage: React.FC = () => {
           )}
         </div>
       </div>
-      {usingMockEmployees && (
-        <div className="p-3 rounded-md bg-yellow-50 border border-yellow-200 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-700 font-medium">Using mock data</span>
-            <span className="text-sm text-muted-foreground">
-              — failed to load employees from server
-            </span>
-          </div>
-          <div>
-            <Button variant="outline" onClick={() => loadEmployees()}>
-              Retry
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* No mock data UI — employees come from backend only */}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           {
             label: "Total Employees",
-            value: employees.length ? employees.length : mockEmployees.length,
+            value: employees.length,
             icon: Users,
           },
           {
             label: "Engineering",
-            value: employees.length
-              ? employees.filter((e) => e.department === "Engineering").length
-              : mockEmployees.filter((e) => e.department === "Engineering")
-                  .length,
+            value: employees.filter((e) => e.department === "Engineering")
+              .length,
             icon: Building2,
           },
-          { label: "Managers", value: managers.length, icon: Briefcase },
+          {
+            label: "Managers",
+            value: managers.length,
+            icon: (props: any) => (
+              <img src="/ust-logo.svg" alt="UST" {...props} />
+            ),
+          },
           {
             label: "Active",
-            value: mockUsers.filter((u) => u.status === "ACTIVE").length,
+            value: usersList.length
+              ? usersList.filter((u: any) => u.status === "ACTIVE").length
+              : employees.length,
             icon: Users,
           },
         ].map((stat, index) => (
@@ -512,14 +507,10 @@ const EmployeesPage: React.FC = () => {
             <TableBody>
               <AnimatePresence>
                 {paginatedEmployees.map((employee, index) => {
-                  // prefer lookup in loaded employees (DB) and fall back to mockEmployees
-                  const manager = employees.length
-                    ? employees.find(
-                        (e) => String(e.e_id) === String(employee.mgr_id)
-                      )
-                    : mockEmployees.find(
-                        (e) => String(e.e_id) === String(employee.mgr_id)
-                      );
+                  // lookup manager from loaded employees
+                  const manager = employees.find(
+                    (e) => String(e.e_id) === String(employee.mgr_id)
+                  );
                   return (
                     <motion.tr
                       key={employee.e_id}

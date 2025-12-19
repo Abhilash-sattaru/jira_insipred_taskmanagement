@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { mockUsers, mockEmployees } from "@/data/mockData";
+// removed mock data imports; use backend APIs only
 import {
   fetchUsers,
   createUser,
@@ -56,7 +56,8 @@ import { cn } from "@/lib/utils";
 
 const UsersPage: React.FC = () => {
   const auth = useAuth();
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
+  const [employees, setEmployees] = React.useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   React.useEffect(() => {
@@ -73,6 +74,7 @@ const UsersPage: React.FC = () => {
         const employeesList: any[] = Array.isArray(empData)
           ? empData.map((e: any) => ({ ...e, e_id: String(e.e_id) }))
           : [];
+        if (mounted) setEmployees(employeesList);
 
         if (mounted && Array.isArray(data)) {
           const mapped = (data as any[]).map((u) => ({
@@ -81,8 +83,8 @@ const UsersPage: React.FC = () => {
             status: u.status || "INACTIVE",
             employee: employeesList.find(
               (ee) => String(ee.e_id) === String(u.e_id)
-            ) || // fallback minimal employee shape
-            {
+            ) || {
+              // fallback minimal employee shape
               e_id: String(u.e_id),
               name: `Emp ${u.e_id}`,
               email: "",
@@ -93,18 +95,18 @@ const UsersPage: React.FC = () => {
           setUsers(mapped as any);
         }
       } catch (err) {
-        console.error("Failed to fetch users from API, using mock data:", err);
+        console.error("Failed to fetch users from API:", err);
         toast({
           title: "Error fetching users",
           description: (err as any)?.message || String(err),
           variant: "destructive",
         });
-        if (mounted) setUsers(mockUsers);
+        if (mounted) setUsers([]);
       } finally {
         if (mounted) setLoadingUsers(false);
       }
     };
-    // Only admin can fetch from API; otherwise keep mockUsers
+    // Only admin can fetch from API
     try {
       if (auth?.hasRole("ADMIN")) loadUsers();
     } catch {
@@ -199,7 +201,7 @@ const UsersPage: React.FC = () => {
           );
           // refresh list
           const data = await fetchUsers(auth?.token || null);
-          setUsers(Array.isArray(data) ? (data as any) : mockUsers);
+          setUsers(Array.isArray(data) ? (data as any) : []);
           toast({
             title: "User Updated",
             description: "User updated successfully",
@@ -221,7 +223,7 @@ const UsersPage: React.FC = () => {
           };
           await createUser(payload, auth?.token || null);
           const data = await fetchUsers(auth?.token || null);
-          setUsers(Array.isArray(data) ? (data as any) : mockUsers);
+          setUsers(Array.isArray(data) ? (data as any) : []);
           toast({
             title: "User Added",
             description: "User added successfully",
@@ -238,7 +240,7 @@ const UsersPage: React.FC = () => {
             )
           );
         } else {
-          const employee = mockEmployees.find((e) => e.e_id === formData.e_id);
+          const employee = employees.find((e: any) => e.e_id === formData.e_id);
           if (!employee) {
             toast({
               title: "Error",
@@ -282,7 +284,7 @@ const UsersPage: React.FC = () => {
       if (auth?.hasRole("ADMIN")) {
         await deleteUser(user.e_id as any, auth?.token || null);
         const data = await fetchUsers(auth?.token || null);
-        setUsers(Array.isArray(data) ? (data as any) : mockUsers);
+        setUsers(Array.isArray(data) ? (data as any) : []);
       } else {
         setUsers((prev) => prev.filter((u) => u.e_id !== user.e_id));
       }
@@ -310,7 +312,7 @@ const UsersPage: React.FC = () => {
       case "ADMIN":
         return <Shield className="w-3 h-3" />;
       case "MANAGER":
-        return <Briefcase className="w-3 h-3" />;
+        return <img src="/ust-logo.svg" alt="UST" className="w-3 h-3" />;
       case "DEVELOPER":
         return <Code className="w-3 h-3" />;
     }
@@ -327,7 +329,7 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const availableEmployees = mockEmployees.filter(
+  const availableEmployees = employees.filter(
     (emp) => !users.some((u) => u.e_id === emp.e_id)
   );
 
